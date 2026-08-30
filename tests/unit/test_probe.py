@@ -117,6 +117,15 @@ def test_replay_fixture_rejects_non_numeric_state_keys() -> None:
         ReplayReadAdapter(value)
 
 
+def test_replay_fixture_rejects_non_gopro_media_directory() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"]["media"] = [
+        {"d": "owned-camera.example.com", "fs": []}
+    ]
+    with pytest.raises(ContractError, match="NNNGOPRO"):
+        ReplayReadAdapter(value)
+
+
 def test_replay_fixture_rejects_non_finite_values() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["responses"]["/gopro/camera/state"]["status"]["8"] = float("nan")
@@ -256,6 +265,31 @@ def test_capability_profile_rejects_unknown_capability_name() -> None:
     profile = json.loads(path.read_text(encoding="utf-8"))
     profile["capabilities"]["firmware_update"] = "observed"
     with pytest.raises(ContractError, match="Additional properties"):
+        validate_document("capability_profile", profile)
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [
+        "ble_discovery_and_wake",
+        "wifi_ap_control",
+        "cohn_control",
+        "camera_effects",
+        "preview",
+        "recording",
+        "hilight",
+        "media_transfer",
+        "gpmf",
+        "disconnect_recovery",
+    ],
+)
+def test_read_only_profile_rejects_observed_non_read_capability(
+    capability: str,
+) -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["capabilities"][capability] = "observed"
+    with pytest.raises(ContractError, match=f"capabilities.{capability}"):
         validate_document("capability_profile", profile)
 
 

@@ -181,4 +181,16 @@ def test_receipt_timeline_compares_instants_across_offsets() -> None:
     receipt = _receipt()
     receipt["started_at"] = "2026-08-30T05:00:00+01:00"
     receipt["finished_at"] = "2026-08-30T04:00:00Z"
+    receipt["steps"][0]["observed_at"] = "2026-08-30T04:00:00Z"
     validate_document("operation_receipt", receipt)
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    ["2026-08-30T04:59:59Z", "2026-08-30T05:00:02Z"],
+)
+def test_receipt_rejects_step_outside_operation_interval(observed_at: str) -> None:
+    receipt = _receipt()
+    receipt["steps"][0]["observed_at"] = observed_at
+    with pytest.raises(ContractError, match="steps.0.observed_at"):
+        validate_document("operation_receipt", receipt)

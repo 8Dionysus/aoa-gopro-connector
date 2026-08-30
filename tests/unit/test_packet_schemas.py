@@ -190,3 +190,13 @@ def test_event_freshness_compares_instants_across_offsets() -> None:
     event["freshness"]["observed_at"] = "2026-08-30T05:00:00+01:00"
     event["freshness"]["expires_at"] = "2026-08-30T04:00:00Z"
     validate_document("event", event)
+
+
+@pytest.mark.parametrize("causal_operation_id", ["", "not-an-operation"])
+def test_event_rejects_invalid_causal_operation_id(
+    causal_operation_id: str,
+) -> None:
+    event = _event()
+    event["causal_operation_id"] = causal_operation_id
+    with pytest.raises(ContractError, match="causal_operation_id"):
+        validate_document("event", event)

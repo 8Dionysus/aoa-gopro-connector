@@ -98,6 +98,17 @@ def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
             "operation_receipt validation failed at finished_at: "
             "must not precede started_at"
         )
+    for index, step in enumerate(document["steps"]):
+        observed_at = _rfc3339_datetime(
+            step["observed_at"],
+            schema_name="operation_receipt",
+            field=f"steps.{index}.observed_at",
+        )
+        if observed_at < started_at or observed_at > finished_at:
+            raise ContractError(
+                f"operation_receipt validation failed at steps.{index}.observed_at: "
+                "must fall within started_at and finished_at"
+            )
 
 
 def _validate_event_freshness(document: dict[str, Any]) -> None:

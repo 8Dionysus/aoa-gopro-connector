@@ -85,6 +85,14 @@ def _validate_response_shapes(responses: dict[str, Any]) -> None:
         _reject_unknown_fields(group, MEDIA_GROUP_FIELDS, label="media group")
         if not isinstance(group, dict):
             continue
+        directory = group.get("d")
+        if directory is not None and (
+            not isinstance(directory, str)
+            or len(directory) != 8
+            or not directory[:3].isdecimal()
+            or directory[3:] != "GOPRO"
+        ):
+            raise ContractError("replay media directory is not in NNNGOPRO form")
         items = group.get("fs")
         if not isinstance(items, list):
             continue

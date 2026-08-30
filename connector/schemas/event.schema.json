@@ -25,7 +25,10 @@
     "event_id": {"type": "string", "pattern": "^event:[a-z0-9][a-z0-9._:-]+$"},
     "event_type": {"type": "string", "minLength": 1},
     "device_ref": {"type": "string", "pattern": "^device:[a-z0-9][a-z0-9._:-]+$"},
-    "causal_operation_id": {"type": ["string", "null"]},
+    "causal_operation_id": {
+      "type": ["string", "null"],
+      "pattern": "^operation:[a-z0-9][a-z0-9._:-]+$"
+    },
     "wall_time": {"type": "string", "format": "date-time"},
     "monotonic_ns": {"type": "integer", "minimum": 0},
     "observed_source": {"type": "string", "minLength": 1},
