@@ -180,9 +180,57 @@
     },
     "evidence_refs": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 3,
+      "maxItems": 3,
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "prefixItems": [
+        {"const": "https://gopro.github.io/OpenGoPro/"},
+        {"const": "https://gopro.github.io/OpenGoPro/http_2_0"},
+        {
+          "oneOf": [
+            {
+              "enum": [
+                "local-live-read-only:operator-authorized-camera",
+                "local-live-read-only:hero13-stock-usb-ncm-phase0-20260829"
+              ]
+            },
+            {"type": "string", "pattern": "^fixture:sha256:[0-9a-f]{64}$"}
+          ]
+        }
+      ],
+      "items": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"posture": {"const": "sanitized_replay"}}},
+      "then": {
+        "properties": {
+          "evidence_refs": {
+            "prefixItems": [
+              {},
+              {},
+              {"type": "string", "pattern": "^fixture:sha256:[0-9a-f]{64}$"}
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "evidence_refs": {
+            "prefixItems": [
+              {},
+              {},
+              {
+                "enum": [
+                  "local-live-read-only:operator-authorized-camera",
+                  "local-live-read-only:hero13-stock-usb-ncm-phase0-20260829"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

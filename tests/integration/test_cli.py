@@ -61,6 +61,15 @@ def test_probe_cli_invalid_port_emits_structured_error(capsys) -> None:
     assert payload["error_type"] == "ContractError"
 
 
+def test_probe_cli_malformed_ipv6_emits_structured_error(capsys) -> None:
+    assert main(["probe", "--base-url", "http://[::1"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ContractError"
+
+
 def test_probe_cli_non_finite_timeout_emits_structured_error(capsys) -> None:
     assert (
         main(
@@ -233,7 +242,7 @@ def test_schema_cli_rejects_unsafe_capability_profile(
         / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     )
     profile = json.loads(source.read_text(encoding="utf-8"))
-    profile["evidence_refs"].append("http://192.168.1.2/private-evidence")
+    profile["limitations"].append("Observed at http://192.168.1.2/private-evidence")
     document = tmp_path / "unsafe-profile.json"
     document.write_text(json.dumps(profile), encoding="utf-8")
 
@@ -243,3 +252,24 @@ def test_schema_cli_rejects_unsafe_capability_profile(
     payload = json.loads(captured.err)
     assert payload["status"] == "error"
     assert payload["error_type"] == "PublicSafetyError"
+
+
+def test_schema_cli_rejects_free_form_profile_evidence_ref(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    source = (
+        REPO_ROOT
+        / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    )
+    profile = json.loads(source.read_text(encoding="utf-8"))
+    profile["evidence_refs"][2] = "kitchen-hero13"
+    document = tmp_path / "free-form-evidence-profile.json"
+    document.write_text(json.dumps(profile), encoding="utf-8")
+
+    assert main(["schema", "validate", "capability_profile", str(document)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ContractError"

@@ -216,3 +216,11 @@ def test_capability_profile_rejects_unknown_capability_name() -> None:
     profile["capabilities"]["firmware_update"] = "observed"
     with pytest.raises(ContractError, match="Additional properties"):
         validate_document("capability_profile", profile)
+
+
+def test_capability_profile_rejects_mismatched_evidence_posture() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["posture"] = "sanitized_replay"
+    with pytest.raises(ContractError, match="evidence_refs.2"):
+        validate_document("capability_profile", profile)

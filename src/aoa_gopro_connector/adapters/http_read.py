@@ -100,7 +100,10 @@ def _host_header(hostname: str, port: int | None) -> str:
 
 
 def _validate_base_url(base_url: str) -> _ValidatedBaseURL:
-    parsed = urlparse(base_url)
+    try:
+        parsed = urlparse(base_url)
+    except ValueError as exc:
+        raise ContractError("camera base URL is malformed") from exc
     if parsed.scheme != "http":
         raise ContractError("camera base URL must use http")
     if parsed.username or parsed.password or parsed.query or parsed.fragment:

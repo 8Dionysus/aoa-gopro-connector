@@ -113,6 +113,11 @@ def test_invalid_port_is_a_contract_error(base_url: str) -> None:
         HTTPReadAdapter(base_url)
 
 
+def test_malformed_bracketed_ipv6_is_a_contract_error() -> None:
+    with pytest.raises(ContractError, match="malformed"):
+        HTTPReadAdapter("http://[::1")
+
+
 @pytest.mark.parametrize(
     "base_url",
     [
