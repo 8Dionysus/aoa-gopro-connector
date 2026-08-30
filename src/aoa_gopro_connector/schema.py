@@ -12,6 +12,7 @@ from jsonschema.exceptions import SchemaError
 
 from .errors import ContractError
 from .json_io import strict_json_loads
+from .redaction import assert_public_safe
 
 
 SCHEMA_NAMES = (
@@ -75,3 +76,5 @@ def validate_document(name: str, document: Any) -> None:
         first = errors[0]
         location = ".".join(str(part) for part in first.path) or "$"
         raise ContractError(f"{name} validation failed at {location}: {first.message}")
+    if name.removesuffix(".schema.json") == "capability_profile":
+        assert_public_safe(document)

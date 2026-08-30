@@ -222,3 +222,24 @@ def test_replay_cli_rejects_identifying_discovery_value(
     payload = json.loads(captured.err)
     assert payload["status"] == "error"
     assert payload["error_type"] == "PublicSafetyError"
+
+
+def test_schema_cli_rejects_unsafe_capability_profile(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    source = (
+        REPO_ROOT
+        / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    )
+    profile = json.loads(source.read_text(encoding="utf-8"))
+    profile["evidence_refs"].append("http://192.168.1.2/private-evidence")
+    document = tmp_path / "unsafe-profile.json"
+    document.write_text(json.dumps(profile), encoding="utf-8")
+
+    assert main(["schema", "validate", "capability_profile", str(document)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "PublicSafetyError"

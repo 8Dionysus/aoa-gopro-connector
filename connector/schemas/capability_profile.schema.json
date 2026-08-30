@@ -110,9 +110,36 @@
     },
     "capabilities": {
       "type": "object",
-      "minProperties": 3,
-      "additionalProperties": {
-        "enum": ["observed", "not_observed", "unsupported", "unknown"]
+      "additionalProperties": false,
+      "required": [
+        "read_camera_info",
+        "read_camera_state",
+        "list_media",
+        "ble_discovery_and_wake",
+        "wifi_ap_control",
+        "cohn_control",
+        "camera_effects",
+        "preview",
+        "recording",
+        "hilight",
+        "media_transfer",
+        "gpmf",
+        "disconnect_recovery"
+      ],
+      "properties": {
+        "read_camera_info": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "read_camera_state": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "list_media": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "ble_discovery_and_wake": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "wifi_ap_control": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "cohn_control": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "camera_effects": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "preview": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "recording": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "hilight": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "media_transfer": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "gpmf": {"enum": ["observed", "not_observed", "unsupported", "unknown"]},
+        "disconnect_recovery": {"enum": ["observed", "not_observed", "unsupported", "unknown"]}
       }
     },
     "sdk": {

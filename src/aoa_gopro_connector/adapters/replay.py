@@ -30,16 +30,17 @@ class ReplayReadAdapter:
             strict_json_dumps(fixture)
         except (TypeError, ValueError) as exc:
             raise ContractError("replay fixture contains non-JSON values") from exc
-        fixture_fields = set(fixture)
+        snapshot = deepcopy(fixture)
+        fixture_fields = set(snapshot)
         if fixture_fields != FIXTURE_FIELDS:
             raise ContractError(
                 "replay fixture fields differ: "
                 f"missing={sorted(FIXTURE_FIELDS - fixture_fields)}, "
                 f"unknown={sorted(fixture_fields - FIXTURE_FIELDS)}"
             )
-        if fixture.get("schema_version") != "aoa_gopro_read_replay_fixture_v1":
+        if snapshot.get("schema_version") != "aoa_gopro_read_replay_fixture_v1":
             raise ContractError("unsupported replay fixture schema")
-        context = fixture.get("context")
+        context = snapshot.get("context")
         if not isinstance(context, dict):
             raise ContractError("replay fixture has no context object")
         context_fields = set(context)
@@ -49,7 +50,7 @@ class ReplayReadAdapter:
                 f"missing={sorted(CONTEXT_FIELDS - context_fields)}, "
                 f"unknown={sorted(context_fields - CONTEXT_FIELDS)}"
             )
-        responses = fixture.get("responses")
+        responses = snapshot.get("responses")
         if not isinstance(responses, dict):
             raise ContractError("replay fixture has no responses object")
         unknown = sorted(set(responses) - set(ALLOWED_READ_PATHS))
@@ -58,10 +59,16 @@ class ReplayReadAdapter:
             raise ContractError(
                 f"replay routes differ: missing={missing}, unknown={unknown}"
             )
-        assert_public_safe(fixture)
-        self.fixture = fixture
-        self.fixture_digest = canonical_digest(fixture)
+        assert_public_safe(snapshot)
+        self._fixture = snapshot
+        self.fixture_digest = canonical_digest(snapshot)
         self._responses = responses
+
+    @property
+    def fixture(self) -> dict[str, Any]:
+        """Return an isolated copy of the content-addressed replay snapshot."""
+
+        return deepcopy(self._fixture)
 
     @classmethod
     def from_path(cls, path: str | Path) -> "ReplayReadAdapter":

@@ -84,6 +84,18 @@ def test_replay_fixture_rejects_non_finite_values() -> None:
         ReplayReadAdapter(value)
 
 
+def test_replay_snapshot_is_immutable_from_public_aliases() -> None:
+    fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    adapter = ReplayReadAdapter(fixture)
+    fixture["responses"]["/gopro/camera/info"]["model_name"] = "HERO12 Black"
+    exposed = adapter.fixture
+    exposed["responses"]["/gopro/camera/info"]["model_name"] = "HERO11 Black"
+
+    response = adapter.get_json("/gopro/camera/info")
+    assert response["model_name"] == "HERO13 Black"
+    assert adapter.fixture_digest == REPLAY_FIXTURE_DIGEST
+
+
 def test_probe_rejects_free_form_protocol_version() -> None:
     adapter = ReplayReadAdapter.from_path(FIXTURE)
     context = _context(adapter)
@@ -188,3 +200,19 @@ def test_named_live_profile_is_valid_and_redacted() -> None:
     assert_public_safe(profile)
     assert profile["observations"]["status_key_count"] == 79
     assert profile["observations"]["setting_key_count"] == 120
+
+
+def test_capability_profile_requires_versioned_capability_vocabulary() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    del profile["capabilities"]["disconnect_recovery"]
+    with pytest.raises(ContractError, match="disconnect_recovery"):
+        validate_document("capability_profile", profile)
+
+
+def test_capability_profile_rejects_unknown_capability_name() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["capabilities"]["firmware_update"] = "observed"
+    with pytest.raises(ContractError, match="Additional properties"):
+        validate_document("capability_profile", profile)
