@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/operation_plan.schema.json",
+  "title": "AoA GoPro operation plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id",
+    "idempotency_key",
+    "camera_ref",
+    "capability_profile_digest",
+    "effect",
+    "preconditions",
+    "deadline",
+    "retry_policy",
+    "expected_postconditions",
+    "privacy_consequence",
+    "retention_consequence",
+    "approval",
+    "plan_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_operation_plan_v1"},
+    "operation_id": {"type": "string", "pattern": "^operation:[a-z0-9][a-z0-9._:-]+$"},
+    "idempotency_key": {"type": "string", "minLength": 8},
+    "camera_ref": {"type": "string", "pattern": "^device:[a-z0-9][a-z0-9._:-]+$"},
+    "capability_profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "parameters"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "parameters": {"type": "object"}
+      }
+    },
+    "preconditions": {
+      "type": "array",
+      "minItems": 1,
+      "contains": {
+        "type": "object",
+        "properties": {
+          "kind": {"const": "lease"},
+          "expected": {"const": "held"}
+        },
+        "required": ["kind", "expected"]
+      },
+      "minContains": 1,
+      "maxContains": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "expected", "observation_ref"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "expected": {},
+          "observation_ref": {"type": "string", "minLength": 1}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"kind": {"const": "lease"}},
+              "required": ["kind"]
+            },
+            "then": {"properties": {"expected": {"const": "held"}}}
+          }
+        ]
+      }
+    },
+    "deadline": {"type": "string", "format": "date-time"},
+    "retry_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attempts", "backoff", "reconcile_indeterminate"],
+      "properties": {
+        "max_attempts": {"type": "integer", "minimum": 1, "maximum": 10},
+        "backoff": {"enum": ["none", "fixed", "exponential_bounded"]},
+        "reconcile_indeterminate": {"type": "boolean"}
+      }
+    },
+    "expected_postconditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "expected", "observation_method"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "expected": {},
+          "observation_method": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "privacy_consequence": {"type": "string", "minLength": 1},
+    "retention_consequence": {"type": "string", "minLength": 1},
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "approval_ref"],
+      "properties": {
+        "required": {"const": true},
+        "approval_ref": {
+          "type": "string",
+          "pattern": "^approval:[a-z0-9][a-z0-9._:-]+$"
+        }
+      }
+    },
+    "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

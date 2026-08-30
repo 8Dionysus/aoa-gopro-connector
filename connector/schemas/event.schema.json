@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/event.schema.json",
+  "title": "AoA GoPro event envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "device_ref",
+    "causal_operation_id",
+    "wall_time",
+    "monotonic_ns",
+    "observed_source",
+    "capability_profile_digest",
+    "confidence",
+    "freshness",
+    "payload",
+    "evidence_refs",
+    "event_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_event_v1"},
+    "event_id": {"type": "string", "pattern": "^event:[a-z0-9][a-z0-9._:-]+$"},
+    "event_type": {"type": "string", "minLength": 1},
+    "device_ref": {"type": "string", "pattern": "^device:[a-z0-9][a-z0-9._:-]+$"},
+    "causal_operation_id": {
+      "type": ["string", "null"],
+      "pattern": "^operation:[a-z0-9][a-z0-9._:-]+$"
+    },
+    "wall_time": {"type": "string", "format": "date-time"},
+    "monotonic_ns": {"type": "integer", "minimum": 0},
+    "observed_source": {"type": "string", "minLength": 1},
+    "capability_profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_at", "expires_at", "posture"],
+      "properties": {
+        "observed_at": {"type": "string", "format": "date-time"},
+        "expires_at": {"type": ["string", "null"], "format": "date-time"},
+        "posture": {"enum": ["current", "stale", "unknown"]}
+      }
+    },
+    "payload": {"type": "object"},
+    "evidence_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "event_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

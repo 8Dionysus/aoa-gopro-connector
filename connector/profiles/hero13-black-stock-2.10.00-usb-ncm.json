@@ -1,0 +1,70 @@
+{
+  "api": {
+    "family": "OpenGoPro",
+    "protocol_version": "1",
+    "spec_version": "2.0"
+  },
+  "camera": {
+    "firmware_posture": "stock",
+    "firmware_release_version": "2.10.00",
+    "firmware_vendor_version": "H24.01.02.10.00",
+    "model_name": "HERO13 Black",
+    "model_number": "65"
+  },
+  "capabilities": {
+    "ble_discovery_and_wake": "not_observed",
+    "camera_effects": "not_observed",
+    "cohn_control": "not_observed",
+    "disconnect_recovery": "not_observed",
+    "gpmf": "not_observed",
+    "hilight": "not_observed",
+    "list_media": "observed",
+    "media_transfer": "not_observed",
+    "preview": "not_observed",
+    "read_camera_info": "observed",
+    "read_camera_state": "observed",
+    "recording": "not_observed",
+    "wifi_ap_control": "not_observed"
+  },
+  "device_ref": "device:redacted",
+  "evidence_refs": [
+    "https://gopro.github.io/OpenGoPro/",
+    "https://gopro.github.io/OpenGoPro/http_2_0",
+    "local-live-read-only:hero13-stock-usb-ncm-phase0-20260829"
+  ],
+  "limitations": [
+    "control_readiness_not_established",
+    "preview_recording_transfer_recovery_endurance_not_observed",
+    "profile_scope_named_model_firmware_topology"
+  ],
+  "observations": {
+    "media_group_count": 0,
+    "media_item_count": 0,
+    "setting_key_count": 120,
+    "status_key_count": 79
+  },
+  "observed_at": "2026-08-30T04:58:16Z",
+  "posture": "live_read_only",
+  "privacy": {
+    "device_identifiers_retained": false,
+    "media_names_retained": false,
+    "network_identity_retained": false,
+    "raw_responses_retained": false
+  },
+  "profile_digest": "sha256:c47747e5d66a2b8b3f0c3ab7b9b143fe7acbb00f5802d2af5dd4f4baec185e71",
+  "profile_id": "gopro-hero13-black-stock-2.10.00-usb-ncm-http",
+  "schema_version": "aoa_gopro_capability_profile_v1",
+  "sdk": {
+    "declared_python": ">=3.11,<3.14",
+    "posture": "optional_adapter",
+    "published_version": "0.22.0"
+  },
+  "transport": {
+    "discovery": [
+      "mdns",
+      "usb"
+    ],
+    "http_read": "observed",
+    "topology": "usb_ncm_http"
+  }
+}

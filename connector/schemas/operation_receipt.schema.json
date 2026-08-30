@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/operation_receipt.schema.json",
+  "title": "AoA GoPro operation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "operation_id",
+    "plan_digest",
+    "outcome",
+    "started_at",
+    "finished_at",
+    "actor_version",
+    "adapter",
+    "before",
+    "after",
+    "steps",
+    "postcondition_verdicts",
+    "recovery",
+    "error",
+    "artifact_refs",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_operation_receipt_v1"},
+    "receipt_id": {"type": "string", "pattern": "^receipt:[a-z0-9][a-z0-9._:-]+$"},
+    "operation_id": {"type": "string", "pattern": "^operation:[a-z0-9][a-z0-9._:-]+$"},
+    "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "outcome": {"enum": ["succeeded", "failed", "cancelled", "indeterminate", "needs_operator"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "actor_version": {"type": "string", "minLength": 1},
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "version", "topology", "capability_profile_digest"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "topology": {"type": "string", "minLength": 1},
+        "capability_profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "before": {"$ref": "#/$defs/stateSnapshot"},
+    "after": {"$ref": "#/$defs/stateSnapshot"},
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step_id", "status", "observed_at", "observation_ref"],
+        "properties": {
+          "step_id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["succeeded", "failed", "cancelled", "indeterminate", "skipped"]},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "observation_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "postcondition_verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "verdict", "observation_ref"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "verdict": {"enum": ["satisfied", "not_satisfied", "unknown"]},
+          "observation_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "attempt_count", "result"],
+      "properties": {
+        "attempted": {"type": "boolean"},
+        "attempt_count": {"type": "integer", "minimum": 0},
+        "result": {"enum": ["not_needed", "recovered", "failed", "indeterminate"]}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"attempted": {"const": false}},
+            "required": ["attempted"]
+          },
+          "then": {
+            "properties": {
+              "attempt_count": {"const": 0},
+              "result": {"const": "not_needed"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"attempted": {"const": true}},
+            "required": ["attempted"]
+          },
+          "then": {
+            "properties": {
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "result": {"enum": ["recovered", "failed", "indeterminate"]}
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "type": ["object", "null"],
+      "properties": {
+        "code": {"type": "string"},
+        "message": {"type": "string"},
+        "retryable": {"type": "boolean"}
+      },
+      "required": ["code", "message", "retryable"],
+      "additionalProperties": false
+    },
+    "artifact_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"outcome": {"const": "succeeded"}},
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "error": {"const": null},
+          "steps": {"minItems": 1},
+          "postcondition_verdicts": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "verdict": {"const": "satisfied"},
+                "observation_ref": {"type": "string", "minLength": 1}
+              },
+              "required": ["verdict", "observation_ref"]
+            }
+          },
+          "recovery": {
+            "properties": {
+              "result": {"enum": ["not_needed", "recovered"]}
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "steps": {
+                "contains": {
+                  "properties": {"status": {"const": "succeeded"}},
+                  "required": ["status"]
+                },
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "recovery": {
+                "properties": {
+                  "attempted": {"const": true},
+                  "result": {"const": "recovered"}
+                },
+                "required": ["attempted", "result"]
+              }
+            }
+          }
+        ]
+      },
+      "else": {
+        "properties": {
+          "error": {"type": "object"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stateSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_at", "state", "state_digest"],
+      "properties": {
+        "observed_at": {"type": "string", "format": "date-time"},
+        "state": {"type": "object"},
+        "state_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+schema: aoa_gopro_connector_manifest_v1
+connector: aoa-gopro-connector
+package: aoa_gopro_connector
+cli: aoa-gopro
+source_family: operator-authorized-gopro-cameras
+domain_posture: physical-sensor-actuator
+current_phase: phase_0
+current_live_modes:
+  - live_read_only
+current_topology_profiles:
+  - hero13-black-stock-2.10.00-usb-ncm
+future_topology_profiles:
+  - ble
+  - wifi-ap
+  - cohn
+storage_roots:
+  - AOA_GOPRO_DATA_ROOT
+  - AOA_GOPRO_CACHE_ROOT
+  - AOA_GOPRO_AUTH_ROOT
+  - AOA_GOPRO_ARTIFACT_ROOT
+  - AOA_GOPRO_MEDIA_ROOT
+authority:
+  runtime_deployment: abyss-stack
+  host_facts: abyss-machine
+  central_proof: aoa-evals
+  measurement_grammar: aoa-stats
+  derived_navigation: aoa-kag

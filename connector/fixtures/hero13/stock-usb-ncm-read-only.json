@@ -1,0 +1,36 @@
+{
+  "schema_version": "aoa_gopro_read_replay_fixture_v1",
+  "context": {
+    "observed_at": "2026-08-29T22:40:00-06:00",
+    "topology": "usb_ncm_http",
+    "discovery": [
+      "mdns",
+      "usb"
+    ],
+    "protocol_version": "1",
+    "firmware_posture": "stock"
+  },
+  "responses": {
+    "/gopro/camera/info": {
+      "model_name": "HERO13 Black",
+      "model_number": "65",
+      "firmware_version": "H24.01.02.10.00"
+    },
+    "/gopro/camera/state": {
+      "status": {
+        "8": 0,
+        "10": 1,
+        "31": 0
+      },
+      "settings": {
+        "2": 1,
+        "3": 1,
+        "24": 0
+      }
+    },
+    "/gopro/media/list": {
+      "id": "fixture-empty-card",
+      "media": []
+    }
+  }
+}

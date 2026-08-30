@@ -1,0 +1,811 @@
+#!/usr/bin/env python3
+"""Validate the public Phase 0 GoPro connector repository."""
+
+from __future__ import annotations
+
+import ast
+import codecs
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from aoa_gopro_connector.adapters import ReplayReadAdapter
+from aoa_gopro_connector.cli import build_parser
+from aoa_gopro_connector.digest import verify_digest
+from aoa_gopro_connector.json_io import strict_json_loads
+from aoa_gopro_connector.probe import ProbeContext, build_capability_profile
+from aoa_gopro_connector.redaction import is_sensitive_key, public_safety_violations
+from aoa_gopro_connector.schema import SCHEMA_NAMES, load_schema, validate_document
+
+
+REQUIRED_FILES = [
+    "AGENTS.md",
+    "README.md",
+    "CHARTER.md",
+    "BOUNDARIES.md",
+    "ROADMAP.md",
+    "STATUS.md",
+    "STORAGE_POLICY.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+    ".env.example",
+    ".gitignore",
+    ".github/workflows/validate.yml",
+    ".connector-state/AGENTS.md",
+    ".connector-state/README.md",
+    "connector/SOURCE_POLICY.md",
+    "connector/manifests/connector_manifest.yaml",
+    "connector/manifests/route_allowlist.yaml",
+    "connector/manifests/artifact_classes.yaml",
+    "connector/fixtures/hero13/stock-usb-ncm-read-only.json",
+    "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json",
+    "docs/ARCHITECTURE.md",
+    "docs/RUNTIME_CONTRACT.md",
+    "decisions/README.md",
+    "decisions/AOA-GOPRO-D-0001-physical-camera-contract.md",
+    "decisions/AOA-GOPRO-D-0002-optional-opengopro-sdk.md",
+    "evals/AGENTS.md",
+    "evals/README.md",
+    "stats/AGENTS.md",
+    "stats/README.md",
+    "src/aoa_gopro_connector/__init__.py",
+    "src/aoa_gopro_connector/cli.py",
+    "src/aoa_gopro_connector/json_io.py",
+    "src/aoa_gopro_connector/models.py",
+    "src/aoa_gopro_connector/probe.py",
+    "src/aoa_gopro_connector/redaction.py",
+    "src/aoa_gopro_connector/adapters/base.py",
+    "src/aoa_gopro_connector/adapters/replay.py",
+    "src/aoa_gopro_connector/adapters/http_read.py",
+    "scripts/validate_connector.py",
+    "scripts/verify_install_route.py",
+]
+
+REQUIRED_DIRS = [
+    ".connector-state/data",
+    ".connector-state/cache",
+    ".connector-state/auth",
+    ".connector-state/artifacts",
+    ".connector-state/media",
+    "connector/schemas",
+    "connector/fixtures",
+    "connector/profiles",
+    "docs",
+    "decisions",
+    "evals/intake",
+    "evals/reports",
+    "stats",
+    "src/aoa_gopro_connector/adapters",
+    "tests/unit",
+    "tests/contract",
+    "tests/integration",
+]
+
+REQUIRED_GITIGNORE = [
+    ".connector-state/auth/*",
+    ".connector-state/media/*",
+    "/data/",
+    "/cache/",
+    "/auth/",
+    "/artifacts/",
+    "/media/",
+    "/raw/",
+    "/captures/",
+    "/packet-dumps/",
+    "*.360",
+    "*.gpr",
+    "*.jpeg",
+    "*.jpg",
+    "*.lrv",
+    "*.mov",
+    "*.mp4",
+    "*.thm",
+    "*.gpmf",
+    "*.wav",
+    "*.cer",
+    "*.crt",
+    "*.der",
+    "*.jks",
+    "*.key",
+    "*.keystore",
+    "*.p12",
+    "*.p8",
+    "*.p7b",
+    "*.p7c",
+    "*.pem",
+    "*.pk8",
+    "*.pkcs8",
+    "*.pfx",
+    "*.ppk",
+    ".env",
+    ".env.*",
+    "!.env.example",
+]
+
+FORBIDDEN_HEAVY_ROOTS = {
+    "data",
+    "cache",
+    "auth",
+    "artifacts",
+    "media",
+    "raw",
+    "captures",
+    "packet-dumps",
+    "exports",
+}
+
+FORBIDDEN_PRIVATE_MEDIA_SUFFIXES = {
+    ".3g2",
+    ".3gp",
+    ".360",
+    ".aac",
+    ".aif",
+    ".aiff",
+    ".amr",
+    ".avi",
+    ".avif",
+    ".bmp",
+    ".dng",
+    ".flac",
+    ".flv",
+    ".gif",
+    ".gpmf",
+    ".gpr",
+    ".heic",
+    ".heif",
+    ".jpeg",
+    ".jpg",
+    ".lrv",
+    ".m2ts",
+    ".m4a",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".mxf",
+    ".ogg",
+    ".ogv",
+    ".opus",
+    ".png",
+    ".raw",
+    ".thm",
+    ".tif",
+    ".tiff",
+    ".vob",
+    ".wav",
+    ".webm",
+    ".webp",
+    ".wma",
+    ".wmv",
+}
+
+for media_suffix in sorted(FORBIDDEN_PRIVATE_MEDIA_SUFFIXES):
+    media_pattern = f"*{media_suffix}"
+    if media_pattern not in REQUIRED_GITIGNORE:
+        REQUIRED_GITIGNORE.append(media_pattern)
+
+# A future public binary artifact must be admitted by exact path and reviewed digest.
+PUBLIC_BINARY_ARTIFACT_DIGESTS: dict[str, str] = {}
+
+FORBIDDEN_CREDENTIAL_SUFFIXES = {
+    ".cer",
+    ".crt",
+    ".der",
+    ".jks",
+    ".key",
+    ".keystore",
+    ".p12",
+    ".p8",
+    ".p7b",
+    ".p7c",
+    ".pem",
+    ".pk8",
+    ".pkcs8",
+    ".pfx",
+    ".ppk",
+}
+
+FORBIDDEN_CREDENTIAL_FILENAMES = {
+    ".env",
+    ".netrc",
+    "credentials.json",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "service-account.json",
+}
+
+FORBIDDEN_PEM_LABELS = (
+    "CERTIFICATE",
+    "DSA PRIVATE KEY",
+    "EC PRIVATE KEY",
+    "ENCRYPTED PRIVATE KEY",
+    "OPENSSH PRIVATE KEY",
+    "PGP PRIVATE KEY BLOCK",
+    "PRIVATE KEY",
+    "RSA PRIVATE KEY",
+)
+FORBIDDEN_PEM_MARKERS = tuple(
+    ("-----BEGIN " + label + "-----").encode("ascii")
+    for label in FORBIDDEN_PEM_LABELS
+)
+
+SNAPSHOT_SCAN_EXCLUDED_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+}
+
+FORBIDDEN_DUPLICATE_DOCS = {
+    "docs/STATUS.md",
+    "docs/ROADMAP.md",
+    "docs/STORAGE_POLICY.md",
+    "connector/STORAGE_POLICY.md",
+    "docs/SOURCE_POLICY.md",
+}
+
+COMMAND_FENCE_LANGUAGES = {
+    "bash",
+    "sh",
+    "shell",
+    "console",
+    "terminal",
+    "powershell",
+    "cmd",
+}
+COMMAND_LINE_RE = re.compile(
+    r"^\s*(?:\$\s+|[A-Z][A-Z0-9_]*=|python(?:3)?\s+|pytest(?:\s|$)|"
+    r"aoa-gopro(?:\s|$)|pip(?:3)?\s+|git\s+|curl\s+|ffmpeg\s+|export\s+)",
+    re.IGNORECASE,
+)
+PLAINTEXT_ASSIGNMENT_RE = re.compile(
+    r"(?ix)(?:"
+    r"(?P<quote>[\"'`])"
+    r"(?P<quoted_key>[a-z0-9][a-z0-9_. -]{0,95})"
+    r"(?P=quote)|"
+    r"(?<![a-z0-9_.-])"
+    r"(?P<bare_key>[a-z0-9][a-z0-9_.-]{0,95})"
+    r")\s*(?:=|:)\s*(?P<value>[^\r\n]*)"
+)
+PUBLIC_ENVIRONMENT_LOCATOR_RE = re.compile(
+    r"(?:[A-Z][A-Z0-9]*_)+(?:DIR|DIRECTORY|ENV|FILE|PATH|REF|REFERENCE|ROOT|VAR|VARIABLE)"
+)
+PUBLIC_CREDENTIAL_PLACEHOLDERS = {
+    "false",
+    "none",
+    "null",
+    "redacted",
+    "removed",
+    "true",
+    "unset",
+}
+PUBLIC_CREDENTIAL_PLACEHOLDER_PREFIXES = (
+    "$",
+    "<",
+    "auth-ref:",
+    "credential-ref:",
+    "dummy",
+    "env:",
+    "example",
+    "fake",
+    "file-ref:",
+    "fixture",
+    "os.environ",
+    "redacted-",
+    "secret-ref:",
+    "synthetic",
+    "vault:",
+)
+
+
+def _load_json(path: Path, errors: list[str]) -> object | None:
+    try:
+        return strict_json_loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        errors.append(f"invalid JSON {path.relative_to(REPO_ROOT)}: {exc}")
+        return None
+
+
+def _check_markdown_command_hygiene(errors: list[str]) -> None:
+    for path in sorted(REPO_ROOT.rglob("*.md")):
+        if path.name == "AGENTS.md" or ".git" in path.parts:
+            continue
+        relative = path.relative_to(REPO_ROOT)
+        marker = ""
+        language = ""
+        start = 0
+        body: list[str] = []
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.lstrip()
+            if not marker:
+                if stripped.startswith("```") or stripped.startswith("~~~"):
+                    marker = stripped[:3]
+                    language = stripped[3:].strip().casefold().split(maxsplit=1)[0]
+                    start = line_number
+                    body = []
+                continue
+            if stripped.startswith(marker):
+                if language in COMMAND_FENCE_LANGUAGES or any(
+                    COMMAND_LINE_RE.match(item) for item in body
+                ):
+                    errors.append(f"command block outside AGENTS.md: {relative}:{start}")
+                marker = ""
+                language = ""
+                body = []
+            else:
+                body.append(line)
+        if marker:
+            errors.append(f"unterminated Markdown fence: {relative}:{start}")
+
+
+def _check_cli_surface(errors: list[str]) -> None:
+    parser = build_parser()
+    choices: set[str] = set()
+    for action in parser._actions:
+        if isinstance(action, __import__("argparse")._SubParsersAction):
+            choices.update(action.choices)
+    required = {"doctor", "probe", "replay-probe", "schema"}
+    if not required.issubset(choices):
+        errors.append(f"CLI missing Phase 0 commands: {sorted(required - choices)}")
+    forbidden = {"execute", "record", "delete", "firmware", "reset", "effect"}
+    if choices & forbidden:
+        errors.append(f"Phase 0 CLI exposes effect commands: {sorted(choices & forbidden)}")
+
+
+def _repository_publication_paths(errors: list[str]) -> tuple[Path, ...]:
+    """Return indexed paths in Git, or all files in an exported source snapshot."""
+
+    if (REPO_ROOT / ".git").exists():
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(REPO_ROOT), "ls-files", "-z", "--cached"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            errors.append(f"cannot inspect Git publication index: {exc}")
+            return ()
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or f"exit {completed.returncode}"
+            errors.append(f"cannot inspect Git publication index: {detail}")
+            return ()
+        return tuple(
+            Path(value) for value in completed.stdout.split("\0") if value
+        )
+
+    paths: list[Path] = []
+    for path in REPO_ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(REPO_ROOT)
+        if any(part in SNAPSHOT_SCAN_EXCLUDED_DIRS for part in relative.parts):
+            continue
+        if any(part.endswith(".egg-info") for part in relative.parts):
+            continue
+        paths.append(relative)
+    return tuple(sorted(paths))
+
+
+def _contains_forbidden_pem_marker(path: Path) -> bool:
+    overlap = max(len(marker) for marker in FORBIDDEN_PEM_MARKERS) - 1
+    carry = b""
+    with path.open("rb") as stream:
+        while chunk := stream.read(64 * 1024):
+            window = carry + chunk
+            if any(marker in window for marker in FORBIDDEN_PEM_MARKERS):
+                return True
+            carry = window[-overlap:]
+    return False
+
+
+def _detected_media_signature(path: Path) -> str | None:
+    with path.open("rb") as stream:
+        header = stream.read(4096)
+    signatures = (
+        (b"\xff\xd8\xff", "JPEG"),
+        (b"\x89PNG\r\n\x1a\n", "PNG"),
+        (b"GIF87a", "GIF"),
+        (b"GIF89a", "GIF"),
+        (b"II*\x00", "TIFF/DNG"),
+        (b"MM\x00*", "TIFF/DNG"),
+        (b"\x1a\x45\xdf\xa3", "Matroska/WebM"),
+        (b"OggS", "Ogg"),
+        (b"fLaC", "FLAC"),
+        (b"ID3", "MP3"),
+        (b"FLV", "Flash Video"),
+        (b"MThd", "MIDI"),
+        (b"#!AMR", "AMR"),
+        (b"\x00\x00\x01\xba", "MPEG program stream"),
+        (b"\x00\x00\x01\xb3", "MPEG video"),
+    )
+    for signature, label in signatures:
+        if header.startswith(signature):
+            return label
+    if header.startswith(b"BM"):
+        return "BMP"
+    if len(header) >= 12 and header[4:8] == b"ftyp":
+        return "ISO base media"
+    if len(header) >= 12 and header.startswith(b"RIFF"):
+        riff_kind = header[8:12]
+        if riff_kind in {b"AVI ", b"WAVE", b"WEBP"}:
+            return f"RIFF {riff_kind.decode('ascii').strip()}"
+    if len(header) >= 12 and header.startswith(b"FORM"):
+        if header[8:12] in {b"AIFF", b"AIFC"}:
+            return "AIFF"
+    if len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0:
+        return "MPEG/AAC audio"
+    for packet_size in (188, 192, 204, 208):
+        for prefix_size in range(16):
+            sync_positions = tuple(
+                prefix_size + packet_size * index for index in range(3)
+            )
+            if len(header) <= sync_positions[-1]:
+                continue
+            if all(header[position] == 0x47 for position in sync_positions):
+                return f"MPEG transport stream ({packet_size}-byte packets)"
+    return None
+
+
+def _verify_public_binary_artifact(
+    relative: Path,
+    candidate: Path,
+    errors: list[str],
+) -> bool:
+    expected = PUBLIC_BINARY_ARTIFACT_DIGESTS.get(relative.as_posix())
+    if expected is None:
+        return False
+    digest = hashlib.sha256()
+    try:
+        with candidate.open("rb") as stream:
+            while chunk := stream.read(64 * 1024):
+                digest.update(chunk)
+    except OSError as exc:
+        errors.append(
+            f"cannot inspect allowlisted binary artifact {relative.as_posix()}: {exc}"
+        )
+        return True
+    actual = "sha256:" + digest.hexdigest()
+    if actual != expected:
+        errors.append(
+            "allowlisted binary artifact digest mismatch: "
+            f"{relative.as_posix()} expected {expected}, got {actual}"
+        )
+    return True
+
+
+def _is_bounded_utf8_text(path: Path) -> bool:
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="strict")
+    with path.open("rb") as stream:
+        while chunk := stream.read(64 * 1024):
+            if b"\x00" in chunk:
+                return False
+            try:
+                text = decoder.decode(chunk)
+            except UnicodeDecodeError:
+                return False
+            if any(ord(character) < 0x20 and character not in "\t\n\r\f" for character in text):
+                return False
+        try:
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            return False
+    return True
+
+
+def _is_public_credential_placeholder(raw_value: str) -> bool:
+    value = raw_value.strip()
+    while value.startswith(("\"", "'", "`")):
+        value = value[1:].lstrip()
+    if not value:
+        return True
+    raw_token = re.split(r"[\s\"'`,;#}\]]", value, maxsplit=1)[0]
+    if PUBLIC_ENVIRONMENT_LOCATOR_RE.fullmatch(raw_token):
+        return True
+    token = raw_token.casefold()
+    return token in PUBLIC_CREDENTIAL_PLACEHOLDERS or token.startswith(
+        PUBLIC_CREDENTIAL_PLACEHOLDER_PREFIXES
+    )
+
+
+def _text_assignment_findings(
+    text: str,
+    *,
+    first_line: int = 1,
+) -> list[tuple[int, str]]:
+    findings: list[tuple[int, str]] = []
+    for offset, line in enumerate(text.splitlines() or (text,), start=first_line):
+        for match in PLAINTEXT_ASSIGNMENT_RE.finditer(line):
+            key = match.group("quoted_key") or match.group("bare_key")
+            if not is_sensitive_key(key):
+                continue
+            if _is_public_credential_placeholder(match.group("value")):
+                continue
+            findings.append((offset, key))
+    return findings
+
+
+def _python_target_keys(node: ast.expr) -> tuple[str, ...]:
+    if isinstance(node, ast.Name):
+        return (node.id,)
+    if isinstance(node, ast.Attribute):
+        return (node.attr,)
+    if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+        if isinstance(node.slice.value, str):
+            return (node.slice.value,)
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return tuple(
+            key for child in node.elts for key in _python_target_keys(child)
+        )
+    return ()
+
+
+def _python_literal_text(node: ast.AST | None) -> str | None:
+    if not isinstance(node, ast.Constant):
+        return None
+    if node.value is None:
+        return "none"
+    if isinstance(node.value, (str, int, float, bool)):
+        return str(node.value)
+    return None
+
+
+def _python_plaintext_credential_findings(
+    text: str,
+) -> list[tuple[int, str]]:
+    tree = ast.parse(text)
+    findings: set[tuple[int, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            findings.update(
+                _text_assignment_findings(node.value, first_line=node.lineno)
+            )
+        if isinstance(node, ast.Assign):
+            keys = tuple(
+                key for target in node.targets for key in _python_target_keys(target)
+            )
+            value = _python_literal_text(node.value)
+        elif isinstance(node, (ast.AnnAssign, ast.NamedExpr)):
+            keys = _python_target_keys(node.target)
+            value = _python_literal_text(node.value)
+        else:
+            keys = ()
+            value = None
+        if value is not None and not _is_public_credential_placeholder(value):
+            findings.update(
+                (node.lineno, key) for key in keys if is_sensitive_key(key)
+            )
+        if isinstance(node, ast.Dict):
+            for key_node, value_node in zip(node.keys, node.values, strict=True):
+                key = _python_literal_text(key_node)
+                value = _python_literal_text(value_node)
+                if (
+                    key is not None
+                    and value is not None
+                    and is_sensitive_key(key)
+                    and not _is_public_credential_placeholder(value)
+                ):
+                    findings.add((node.lineno, key))
+    return sorted(findings)
+
+
+def _plaintext_credential_errors(relative: Path, path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        findings = (
+            _python_plaintext_credential_findings(text)
+            if relative.suffix.casefold() in {".py", ".pyi"}
+            else _text_assignment_findings(text)
+        )
+    except SyntaxError as exc:
+        line = exc.lineno or 1
+        return [
+            "cannot inspect Python publication text: "
+            f"{relative.as_posix()}:{line}"
+        ]
+    return [
+        "forbidden plaintext credential in repository: "
+        f"{relative.as_posix()}:{line} key {key}"
+        for line, key in findings
+    ]
+
+
+def _check_private_repository_files(errors: list[str]) -> int:
+    paths = _repository_publication_paths(errors)
+    published = {relative.as_posix() for relative in paths}
+    for relative in sorted(set(PUBLIC_BINARY_ARTIFACT_DIGESTS) - published):
+        errors.append(f"allowlisted binary artifact is not published: {relative}")
+    for relative in paths:
+        candidate = REPO_ROOT / relative
+        if _verify_public_binary_artifact(relative, candidate, errors):
+            continue
+        if relative.suffix.casefold() in FORBIDDEN_PRIVATE_MEDIA_SUFFIXES:
+            errors.append(
+                "forbidden private/heavy media file in repository: "
+                f"{relative.as_posix()}"
+            )
+            continue
+        filename = relative.name.casefold()
+        if (
+            relative.suffix.casefold() in FORBIDDEN_CREDENTIAL_SUFFIXES
+            or filename in FORBIDDEN_CREDENTIAL_FILENAMES
+            or (filename.startswith(".env.") and filename != ".env.example")
+        ):
+            errors.append(
+                "forbidden credential/certificate file in repository: "
+                f"{relative.as_posix()}"
+            )
+            continue
+        if candidate.is_symlink() or not candidate.is_file():
+            continue
+        try:
+            contains_marker = _contains_forbidden_pem_marker(candidate)
+            media_signature = _detected_media_signature(candidate)
+            is_text = _is_bounded_utf8_text(candidate)
+        except OSError as exc:
+            errors.append(
+                f"cannot inspect publication file {relative.as_posix()}: {exc}"
+            )
+            continue
+        if contains_marker:
+            errors.append(
+                "forbidden credential/certificate material in repository: "
+                f"{relative.as_posix()}"
+            )
+        if media_signature is not None:
+            errors.append(
+                "forbidden private/heavy media content in repository: "
+                f"{relative.as_posix()} detected {media_signature}"
+            )
+        elif not is_text:
+            errors.append(
+                "non-allowlisted binary artifact in repository: "
+                f"{relative.as_posix()}"
+            )
+        if is_text:
+            errors.extend(_plaintext_credential_errors(relative, candidate))
+    return len(paths)
+
+
+def _fixture_context(adapter: ReplayReadAdapter) -> ProbeContext:
+    context = adapter.fixture["context"]
+    return ProbeContext(
+        observed_at=context["observed_at"],
+        topology=context["topology"],
+        discovery=tuple(context["discovery"]),
+        protocol_version=context["protocol_version"],
+        firmware_posture=context["firmware_posture"],
+        evidence_ref=f"fixture:{adapter.fixture_digest}",
+    )
+
+
+def main() -> int:
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    for relative in REQUIRED_FILES:
+        if not (REPO_ROOT / relative).is_file():
+            errors.append(f"missing required file: {relative}")
+    for relative in REQUIRED_DIRS:
+        if not (REPO_ROOT / relative).is_dir():
+            errors.append(f"missing required directory: {relative}")
+    for relative in FORBIDDEN_DUPLICATE_DOCS:
+        if (REPO_ROOT / relative).exists():
+            errors.append(f"duplicate canonical documentation surface: {relative}")
+    for name in FORBIDDEN_HEAVY_ROOTS:
+        if (REPO_ROOT / name).exists():
+            errors.append(f"heavy/private root exists in Git repository: {name}")
+    publication_path_count = _check_private_repository_files(errors)
+
+    gitignore_path = REPO_ROOT / ".gitignore"
+    gitignore = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+    gitignore_lines = {line.strip() for line in gitignore.splitlines()}
+    for pattern in REQUIRED_GITIGNORE:
+        if pattern not in gitignore_lines:
+            errors.append(f".gitignore missing private/heavy pattern: {pattern}")
+
+    for name in SCHEMA_NAMES:
+        try:
+            load_schema(name)
+        except Exception as exc:  # validator boundary reports every contract failure
+            errors.append(f"schema {name} invalid: {exc}")
+
+    fixture_paths = sorted((REPO_ROOT / "connector" / "fixtures").rglob("*.json"))
+    profile_paths = sorted((REPO_ROOT / "connector" / "profiles").rglob("*.json"))
+    public_json_paths = [*fixture_paths, *profile_paths]
+    for path in profile_paths:
+        value = _load_json(path, errors)
+        if value is None:
+            continue
+        for violation in public_safety_violations(value):
+            errors.append(
+                f"public artifact unsafe {path.relative_to(REPO_ROOT)}: {violation}"
+            )
+        if not isinstance(value, dict):
+            errors.append(
+                f"capability profile is not an object: {path.relative_to(REPO_ROOT)}"
+            )
+            continue
+        try:
+            validate_document("capability_profile", value)
+            verify_digest(value, "profile_digest")
+        except Exception as exc:
+            errors.append(
+                f"capability profile invalid {path.relative_to(REPO_ROOT)}: {exc}"
+            )
+
+    for path in fixture_paths:
+        value = _load_json(path, errors)
+        if value is None:
+            continue
+        for violation in public_safety_violations(value):
+            errors.append(
+                f"public artifact unsafe {path.relative_to(REPO_ROOT)}: {violation}"
+            )
+        if not isinstance(value, dict):
+            errors.append(
+                f"replay fixture is not an object: {path.relative_to(REPO_ROOT)}"
+            )
+            continue
+        try:
+            replay = ReplayReadAdapter(value)
+            replay_profile = build_capability_profile(replay, _fixture_context(replay))
+            validate_document("capability_profile", replay_profile)
+        except Exception as exc:
+            errors.append(
+                f"replay fixture invalid {path.relative_to(REPO_ROOT)}: {exc}"
+            )
+
+    allowlist_path = REPO_ROOT / "connector/manifests/route_allowlist.yaml"
+    allowlist = allowlist_path.read_text(encoding="utf-8") if allowlist_path.exists() else ""
+    for route in ("/gopro/camera/info", "/gopro/camera/state", "/gopro/media/list"):
+        if route not in allowlist:
+            errors.append(f"read allowlist missing route: {route}")
+    if "effect_routes: []" not in allowlist or re.search(
+        r"^\s*method:\s*(?!GET\s*$)\S+", allowlist, re.MULTILINE
+    ):
+        errors.append("Phase 0 route allowlist contains an effect or non-GET method")
+
+    _check_cli_surface(errors)
+    _check_markdown_command_hygiene(errors)
+
+    payload = {
+        "schema_version": "aoa_gopro_connector_validation_v1",
+        "status": "ok" if not errors else "error",
+        "repo_root": str(REPO_ROOT),
+        "errors": errors,
+        "warnings": warnings,
+        "checked": {
+            "required_files": len(REQUIRED_FILES),
+            "required_dirs": len(REQUIRED_DIRS),
+            "schemas": len(SCHEMA_NAMES),
+            "public_json_artifacts": len(public_json_paths),
+            "publication_paths": publication_path_count,
+        },
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0 if not errors else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

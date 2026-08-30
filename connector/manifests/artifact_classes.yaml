@@ -1,0 +1,28 @@
+schema: aoa_gopro_artifact_classes_v1
+git_allowed:
+  - source_code
+  - schemas
+  - documentation
+  - tests
+  - synthetic_replay_fixtures
+  - sanitized_capability_profiles
+external_private:
+  - device_registry
+  - operation_and_event_journals
+  - credentials_and_certificates
+  - approvals
+  - private_device_identity
+  - preview_buffers
+  - transfer_state
+  - media_inventory_with_names
+  - original_media
+  - telemetry_and_semantic_derivatives
+  - receipts_and_reports
+forbidden_public_fields:
+  - serial_number
+  - hostname
+  - mac_address
+  - ssid
+  - network_address
+  - credential
+  - certificate
