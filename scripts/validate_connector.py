@@ -89,18 +89,32 @@ REQUIRED_DIRS = [
 REQUIRED_GITIGNORE = [
     ".connector-state/auth/*",
     ".connector-state/media/*",
-    "data/",
-    "cache/",
-    "auth/",
-    "artifacts/",
-    "media/",
-    "raw/",
-    "captures/",
-    "packet-dumps/",
+    "/data/",
+    "/cache/",
+    "/auth/",
+    "/artifacts/",
+    "/media/",
+    "/raw/",
+    "/captures/",
+    "/packet-dumps/",
     "*.mp4",
     "*.lrv",
     "*.thm",
     "*.gpmf",
+    "*.cer",
+    "*.crt",
+    "*.der",
+    "*.jks",
+    "*.key",
+    "*.keystore",
+    "*.p12",
+    "*.p7b",
+    "*.p7c",
+    "*.pem",
+    "*.pfx",
+    ".env",
+    ".env.*",
+    "!.env.example",
 ]
 
 FORBIDDEN_HEAVY_ROOTS = {
@@ -121,6 +135,46 @@ FORBIDDEN_PRIVATE_MEDIA_SUFFIXES = {
     ".mp4",
     ".thm",
 }
+
+FORBIDDEN_CREDENTIAL_SUFFIXES = {
+    ".cer",
+    ".crt",
+    ".der",
+    ".jks",
+    ".key",
+    ".keystore",
+    ".p12",
+    ".p7b",
+    ".p7c",
+    ".pem",
+    ".pfx",
+}
+
+FORBIDDEN_CREDENTIAL_FILENAMES = {
+    ".env",
+    ".netrc",
+    "credentials.json",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "service-account.json",
+}
+
+FORBIDDEN_PEM_LABELS = (
+    "CERTIFICATE",
+    "DSA PRIVATE KEY",
+    "EC PRIVATE KEY",
+    "ENCRYPTED PRIVATE KEY",
+    "OPENSSH PRIVATE KEY",
+    "PGP PRIVATE KEY BLOCK",
+    "PRIVATE KEY",
+    "RSA PRIVATE KEY",
+)
+FORBIDDEN_PEM_MARKERS = tuple(
+    ("-----BEGIN " + label + "-----").encode("ascii")
+    for label in FORBIDDEN_PEM_LABELS
+)
 
 SNAPSHOT_SCAN_EXCLUDED_DIRS = {
     ".git",
@@ -248,12 +302,51 @@ def _repository_publication_paths(errors: list[str]) -> tuple[Path, ...]:
     return tuple(sorted(paths))
 
 
-def _check_private_media_files(errors: list[str]) -> int:
+def _contains_forbidden_pem_marker(path: Path) -> bool:
+    overlap = max(len(marker) for marker in FORBIDDEN_PEM_MARKERS) - 1
+    carry = b""
+    with path.open("rb") as stream:
+        while chunk := stream.read(64 * 1024):
+            window = carry + chunk
+            if any(marker in window for marker in FORBIDDEN_PEM_MARKERS):
+                return True
+            carry = window[-overlap:]
+    return False
+
+
+def _check_private_repository_files(errors: list[str]) -> int:
     paths = _repository_publication_paths(errors)
     for relative in paths:
         if relative.suffix.casefold() in FORBIDDEN_PRIVATE_MEDIA_SUFFIXES:
             errors.append(
                 "forbidden private/heavy media file in repository: "
+                f"{relative.as_posix()}"
+            )
+            continue
+        filename = relative.name.casefold()
+        if (
+            relative.suffix.casefold() in FORBIDDEN_CREDENTIAL_SUFFIXES
+            or filename in FORBIDDEN_CREDENTIAL_FILENAMES
+            or (filename.startswith(".env.") and filename != ".env.example")
+        ):
+            errors.append(
+                "forbidden credential/certificate file in repository: "
+                f"{relative.as_posix()}"
+            )
+            continue
+        candidate = REPO_ROOT / relative
+        if candidate.is_symlink() or not candidate.is_file():
+            continue
+        try:
+            contains_marker = _contains_forbidden_pem_marker(candidate)
+        except OSError as exc:
+            errors.append(
+                f"cannot inspect publication file {relative.as_posix()}: {exc}"
+            )
+            continue
+        if contains_marker:
+            errors.append(
+                "forbidden credential/certificate material in repository: "
                 f"{relative.as_posix()}"
             )
     return len(paths)
@@ -287,12 +380,13 @@ def main() -> int:
     for name in FORBIDDEN_HEAVY_ROOTS:
         if (REPO_ROOT / name).exists():
             errors.append(f"heavy/private root exists in Git repository: {name}")
-    publication_path_count = _check_private_media_files(errors)
+    publication_path_count = _check_private_repository_files(errors)
 
     gitignore_path = REPO_ROOT / ".gitignore"
     gitignore = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+    gitignore_lines = {line.strip() for line in gitignore.splitlines()}
     for pattern in REQUIRED_GITIGNORE:
-        if pattern not in gitignore:
+        if pattern not in gitignore_lines:
             errors.append(f".gitignore missing private/heavy pattern: {pattern}")
 
     for name in SCHEMA_NAMES:

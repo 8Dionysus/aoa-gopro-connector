@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +76,10 @@ def _validate_response_shapes(responses: dict[str, Any]) -> None:
                     f"camera state {section_name} contains non-numeric keys: "
                     f"{invalid_keys}"
                 )
-            if any(type(item) not in (bool, int, float) for item in section.values()):
+            if any(
+                type(item) not in (bool, int, float, Decimal)
+                for item in section.values()
+            ):
                 raise ContractError(
                     f"camera state {section_name} contains non-scalar values"
                 )

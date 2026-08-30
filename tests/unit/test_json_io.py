@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import json
 
 import pytest
@@ -15,9 +16,15 @@ def test_strict_json_loads_rejects_nonstandard_numeric_constants(
         strict_json_loads(f'{{"value": {constant}}}')
 
 
-def test_strict_json_loads_rejects_float_overflow() -> None:
-    with pytest.raises(json.JSONDecodeError, match="finite float range"):
-        strict_json_loads('{"value": 1e999}')
+def test_strict_json_loads_rejects_excessive_decimal_exponent() -> None:
+    with pytest.raises(json.JSONDecodeError, match="exponent exceeds"):
+        strict_json_loads('{"value": 1e10001}')
+
+
+def test_strict_json_loads_preserves_tiny_decimal_value() -> None:
+    decoded = strict_json_loads('{"value": 1e-9999}')
+    assert decoded == {"value": Decimal("1e-9999")}
+    assert strict_json_dumps(decoded, separators=(",", ":")) == '{"value":1e-9999}'
 
 
 def test_strict_json_loads_rejects_oversized_integer() -> None:
@@ -74,3 +81,19 @@ def test_strict_json_dumps_still_rejects_circular_reference() -> None:
     value.append(value)
     with pytest.raises(ValueError, match="Circular reference"):
         strict_json_dumps(value)
+
+
+@pytest.mark.parametrize(
+    ("value", "encoded"),
+    [
+        (Decimal("0.0"), "0"),
+        (Decimal("0.1000"), "0.1"),
+        (Decimal("1000000000000000000000"), "1e21"),
+        (Decimal("-0.0000001"), "-1e-7"),
+    ],
+)
+def test_strict_json_dumps_canonicalizes_decimal_numbers(
+    value: Decimal,
+    encoded: str,
+) -> None:
+    assert strict_json_dumps(value) == encoded

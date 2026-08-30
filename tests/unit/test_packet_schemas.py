@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest
 from aoa_gopro_connector.errors import ContractError
+from aoa_gopro_connector.json_io import strict_json_dumps, strict_json_loads
 from aoa_gopro_connector.schema import validate_document
 
 
@@ -95,6 +98,21 @@ def _media_manifest() -> dict[str, object]:
 
 def test_operation_plan_contract() -> None:
     validate_document("operation_plan", _operation_plan())
+
+
+def test_operation_plan_decimal_parameter_integrity_survives_wire_decode() -> None:
+    plan = _operation_plan()
+    plan["effect"]["parameters"] = {"exposure": Decimal("0.0")}
+    plan = attach_digest(plan, "plan_digest")
+    encoded = strict_json_dumps(plan, sort_keys=True, separators=(",", ":"))
+    decoded = strict_json_loads(encoded)
+    validate_document("operation_plan", decoded)
+
+    attacked = strict_json_loads(
+        encoded.replace('"exposure":0', '"exposure":1e-9999')
+    )
+    with pytest.raises(ContractError, match="plan_digest"):
+        validate_document("operation_plan", attacked)
 
 
 @pytest.mark.parametrize(

@@ -112,3 +112,74 @@ def test_repository_validator_rejects_force_tracked_private_media(
         "forbidden private/heavy media file in repository: tests/private.mp4"
         in payload["errors"]
     )
+
+
+def test_repository_validator_rejects_force_tracked_certificate(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    certificate = repo_copy / "tests/camera-private-key.pem"
+    certificate.write_bytes(b"synthetic private material")
+    subprocess.run(
+        ["git", "add", "-f", "tests/camera-private-key.pem"],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert (
+        "forbidden credential/certificate file in repository: "
+        "tests/camera-private-key.pem"
+        in payload["errors"]
+    )
+
+
+def test_repository_validator_rejects_secret_marker_without_secret_suffix(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    disguised_secret = repo_copy / "tests/disguised-credential.txt"
+    marker = "-----BEGIN " + "PRIVATE KEY-----"
+    disguised_secret.write_text(marker, encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "tests/disguised-credential.txt"],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert (
+        "forbidden credential/certificate material in repository: "
+        "tests/disguised-credential.txt"
+        in payload["errors"]
+    )
