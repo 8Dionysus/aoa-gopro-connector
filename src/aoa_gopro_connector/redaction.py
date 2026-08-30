@@ -28,6 +28,7 @@ SENSITIVE_KEYS = {
     "certificate",
     "private_key",
     "password",
+    "passphrase",
     "token",
     "device_id",
     "device_identifier",
@@ -80,6 +81,7 @@ SENSITIVE_KEY_COMPONENT_PAIRS = {
     ("private", "key"),
     ("unique", "id"),
     ("user", "id"),
+    ("wifi", "name"),
 }
 
 VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (

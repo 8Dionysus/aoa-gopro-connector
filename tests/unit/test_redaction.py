@@ -36,6 +36,8 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
         {"wifiPassword": "synthetic-secret"},
         {"wifiSsid": "synthetic-network"},
         {"authToken": "synthetic-secret"},
+        {"passphrase": "correct horse battery staple"},
+        {"wifiName": "Kitchen"},
     ],
 )
 def test_public_safety_rejects_identity(value: object) -> None:

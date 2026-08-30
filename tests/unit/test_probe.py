@@ -69,6 +69,8 @@ def test_replay_builds_content_addressed_public_profile() -> None:
         "wifiPassword",
         "wifiSsid",
         "authToken",
+        "passphrase",
+        "wifiName",
     ],
 )
 def test_replay_fixture_rejects_sensitive_keys(key: str) -> None:
@@ -87,6 +89,31 @@ def test_replay_fixture_rejects_unknown_public_fields() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["fixture_id"] = "kitchen-hero13"
     with pytest.raises(ContractError, match="replay fixture fields differ"):
+        ReplayReadAdapter(value)
+
+
+@pytest.mark.parametrize(
+    ("route", "field"),
+    [
+        ("/gopro/camera/info", "unexpectedInfo"),
+        ("/gopro/camera/state", "unexpectedState"),
+        ("/gopro/media/list", "unexpectedMedia"),
+    ],
+)
+def test_replay_fixture_rejects_unknown_response_fields(
+    route: str,
+    field: str,
+) -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"][route][field] = "synthetic"
+    with pytest.raises(ContractError, match="unknown fields"):
+        ReplayReadAdapter(value)
+
+
+def test_replay_fixture_rejects_non_numeric_state_keys() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/camera/state"]["status"]["unitReference"] = 1
+    with pytest.raises(ContractError, match="non-numeric keys"):
         ReplayReadAdapter(value)
 
 

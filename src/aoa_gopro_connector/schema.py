@@ -67,28 +67,58 @@ def load_schema(name: str) -> dict[str, Any]:
     return value
 
 
-def _rfc3339_datetime(value: str, *, field: str) -> datetime:
+def _rfc3339_datetime(value: str, *, schema_name: str, field: str) -> datetime:
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
         raise ContractError(
-            f"operation_receipt validation failed at {field}: invalid date-time"
+            f"{schema_name} validation failed at {field}: invalid date-time"
         ) from exc
     if parsed.tzinfo is None:
         raise ContractError(
-            f"operation_receipt validation failed at {field}: timezone is required"
+            f"{schema_name} validation failed at {field}: timezone is required"
         )
     return parsed
 
 
 def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
-    started_at = _rfc3339_datetime(document["started_at"], field="started_at")
-    finished_at = _rfc3339_datetime(document["finished_at"], field="finished_at")
+    started_at = _rfc3339_datetime(
+        document["started_at"],
+        schema_name="operation_receipt",
+        field="started_at",
+    )
+    finished_at = _rfc3339_datetime(
+        document["finished_at"],
+        schema_name="operation_receipt",
+        field="finished_at",
+    )
     if finished_at < started_at:
         raise ContractError(
             "operation_receipt validation failed at finished_at: "
             "must not precede started_at"
+        )
+
+
+def _validate_event_freshness(document: dict[str, Any]) -> None:
+    freshness = document["freshness"]
+    observed_at = _rfc3339_datetime(
+        freshness["observed_at"],
+        schema_name="event",
+        field="freshness.observed_at",
+    )
+    expires_value = freshness["expires_at"]
+    if expires_value is None:
+        return
+    expires_at = _rfc3339_datetime(
+        expires_value,
+        schema_name="event",
+        field="freshness.expires_at",
+    )
+    if expires_at < observed_at:
+        raise ContractError(
+            "event validation failed at freshness.expires_at: "
+            "must not precede freshness.observed_at"
         )
 
 
@@ -107,3 +137,5 @@ def validate_document(name: str, document: Any) -> None:
         assert_public_safe(document)
     elif normalized_name == "operation_receipt":
         _validate_operation_receipt_timeline(document)
+    elif normalized_name == "event":
+        _validate_event_freshness(document)

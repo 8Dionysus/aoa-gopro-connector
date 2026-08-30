@@ -176,3 +176,17 @@ def test_event_and_media_contracts() -> None:
             "manifest_digest": ZERO_DIGEST,
         },
     )
+
+
+def test_event_rejects_expiration_before_observation() -> None:
+    event = _event()
+    event["freshness"]["expires_at"] = "2026-08-30T04:59:59Z"
+    with pytest.raises(ContractError, match="freshness.expires_at"):
+        validate_document("event", event)
+
+
+def test_event_freshness_compares_instants_across_offsets() -> None:
+    event = _event()
+    event["freshness"]["observed_at"] = "2026-08-30T05:00:00+01:00"
+    event["freshness"]["expires_at"] = "2026-08-30T04:00:00Z"
+    validate_document("event", event)
