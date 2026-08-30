@@ -80,7 +80,33 @@
         "attempted": {"type": "boolean"},
         "attempt_count": {"type": "integer", "minimum": 0},
         "result": {"enum": ["not_needed", "recovered", "failed", "indeterminate"]}
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"attempted": {"const": false}},
+            "required": ["attempted"]
+          },
+          "then": {
+            "properties": {
+              "attempt_count": {"const": 0},
+              "result": {"const": "not_needed"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"attempted": {"const": true}},
+            "required": ["attempted"]
+          },
+          "then": {
+            "properties": {
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "result": {"enum": ["recovered", "failed", "indeterminate"]}
+            }
+          }
+        }
+      ]
     },
     "error": {
       "type": ["object", "null"],

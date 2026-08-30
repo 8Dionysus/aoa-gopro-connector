@@ -14,7 +14,7 @@ from typing import Any, Sequence
 from . import __version__
 from .adapters import HTTPReadAdapter, ReplayReadAdapter
 from .config import resolve_storage_roots
-from .errors import GoProConnectorError
+from .errors import ContractError, GoProConnectorError
 from .probe import ProbeContext, build_capability_profile
 from .schema import SCHEMA_NAMES, load_schema, schema_root, validate_document
 
@@ -71,13 +71,32 @@ def _replay_probe(args: argparse.Namespace) -> dict[str, Any]:
     context_value = fixture.get("context", {})
     if not isinstance(context_value, dict):
         raise GoProConnectorError("replay fixture context is invalid")
+    string_fields: dict[str, str] = {}
+    for field in (
+        "observed_at",
+        "topology",
+        "protocol_version",
+        "firmware_posture",
+    ):
+        value = context_value.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ContractError(f"replay fixture context {field} is invalid")
+        string_fields[field] = value
+    discovery = context_value.get("discovery")
+    if not isinstance(discovery, list) or any(
+        not isinstance(item, str) or not item.strip() for item in discovery
+    ):
+        raise ContractError("replay fixture context discovery must be a string list")
+    fixture_id = fixture.get("fixture_id")
+    if not isinstance(fixture_id, str) or not fixture_id.strip():
+        raise ContractError("replay fixture_id is invalid")
     context = ProbeContext(
-        observed_at=str(context_value.get("observed_at", "1970-01-01T00:00:00Z")),
-        topology=str(context_value.get("topology", "usb_ncm_http")),
-        discovery=tuple(context_value.get("discovery", ["replay"])),
-        protocol_version=str(context_value.get("protocol_version", "unknown")),
-        firmware_posture=str(context_value.get("firmware_posture", "unknown")),
-        evidence_ref=f"fixture:{fixture.get('fixture_id', 'unknown')}",
+        observed_at=string_fields["observed_at"],
+        topology=string_fields["topology"],
+        discovery=tuple(discovery),
+        protocol_version=string_fields["protocol_version"],
+        firmware_posture=string_fields["firmware_posture"],
+        evidence_ref=f"fixture:{fixture_id}",
     )
     return build_capability_profile(adapter, context)
 

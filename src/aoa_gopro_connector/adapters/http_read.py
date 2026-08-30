@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import math
 import urllib.error
 import urllib.request
 from typing import Any
@@ -51,8 +52,12 @@ def _validate_base_url(base_url: str) -> str:
 
 class HTTPReadAdapter:
     def __init__(self, base_url: str, *, timeout_seconds: float = 5.0) -> None:
-        if timeout_seconds <= 0 or timeout_seconds > 30:
-            raise ContractError("timeout must be within (0, 30] seconds")
+        if (
+            not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+            or timeout_seconds > 30
+        ):
+            raise ContractError("timeout must be finite and within (0, 30] seconds")
         self._base_url = _validate_base_url(base_url)
         self._timeout_seconds = timeout_seconds
         self._opener = urllib.request.build_opener(

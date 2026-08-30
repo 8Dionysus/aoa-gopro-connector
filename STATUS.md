@@ -6,11 +6,12 @@ private device identity, and operator media are not repository status.
 
 ## Current posture
 
-The repository has a local Phase 0 candidate. Its source validator, six packet
-schemas, public-artifact safety checks, replay path, 25 tests, static check,
-sdist/wheel build, and wheel-installed doctor/replay route pass on the current
-host. GitHub CI and landing remain separate pending evidence. No release,
-deployment, effect admission, semantic acceptance, or Goal closure is claimed.
+The repository has a Phase 0 PR candidate. Its source validator, six packet
+schemas, public-artifact safety checks, replay path, durable test suite, static
+check, sdist/wheel build, and wheel-installed doctor/replay route pass locally
+and in the GitHub Python 3.11/3.13/3.14 PR-head matrix. Review and landing
+remain separate evidence. No release, deployment, effect admission, semantic
+acceptance, or Goal closure is claimed.
 
 ## Named hardware baseline
 
@@ -36,8 +37,8 @@ compatibility profile.
 
 | Claim | State |
 | --- | --- |
-| Source-ready | Local Phase 0 candidate; remote review and landing pending |
-| Offline-CI-ready | Local validator/tests/install green; GitHub CI pending |
+| Source-ready | Phase 0 PR candidate; review and landing remain separate |
+| Offline-CI-ready | Local and GitHub PR-head validator/tests/install green |
 | Named hardware profile-ready | Read-only baseline only |
 | Standalone-runtime-ready | Not established |
 | Deployed | Not established |

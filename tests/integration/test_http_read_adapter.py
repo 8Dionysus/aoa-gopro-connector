@@ -105,6 +105,15 @@ def test_invalid_port_is_a_contract_error(base_url: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "timeout_seconds",
+    [float("nan"), float("inf"), float("-inf")],
+)
+def test_non_finite_timeout_is_a_contract_error(timeout_seconds: float) -> None:
+    with pytest.raises(ContractError, match="finite"):
+        HTTPReadAdapter("http://127.0.0.1", timeout_seconds=timeout_seconds)
+
+
+@pytest.mark.parametrize(
     ("base_url", "expected"),
     [
         ("http://[::1]", "http://[::1]"),

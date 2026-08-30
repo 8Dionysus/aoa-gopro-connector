@@ -100,3 +100,29 @@ def test_failed_receipt_may_preserve_unknown_postcondition() -> None:
     receipt = _receipt("failed")
     receipt["postcondition_verdicts"] = []
     validate_document("operation_receipt", receipt)
+
+
+@pytest.mark.parametrize(
+    "recovery",
+    [
+        {"attempted": False, "attempt_count": 5, "result": "recovered"},
+        {"attempted": True, "attempt_count": 0, "result": "not_needed"},
+    ],
+)
+def test_recovery_receipt_rejects_contradictory_fields(
+    recovery: dict[str, object],
+) -> None:
+    receipt = _receipt()
+    receipt["recovery"] = recovery
+    with pytest.raises(ContractError, match="recovery.attempt_count"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_recovery_receipt_accepts_attempted_recovery() -> None:
+    receipt = _receipt()
+    receipt["recovery"] = {
+        "attempted": True,
+        "attempt_count": 1,
+        "result": "recovered",
+    }
+    validate_document("operation_receipt", receipt)
