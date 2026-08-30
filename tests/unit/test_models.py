@@ -11,6 +11,7 @@ from aoa_gopro_connector.models import (
     Power,
     Presence,
     canonical_profile_id,
+    normalize_firmware_release,
 )
 from aoa_gopro_connector.schema import validate_document
 
@@ -51,6 +52,17 @@ def test_degraded_state_requires_reason() -> None:
         CameraState(health=Health.DEGRADED).validate()
 
 
+def test_absent_state_requires_offline_network_in_model_and_schema() -> None:
+    state = CameraState(network=Network.READY)
+    with pytest.raises(ContractError, match="network=offline"):
+        state.validate()
+
+    document = CameraState().as_dict()
+    document["network"] = "ready"
+    with pytest.raises(ContractError, match="network"):
+        validate_document("camera_state", document)
+
+
 def test_schema_rejects_control_ready_without_power_on() -> None:
     document = CameraState(
         presence=Presence.DISCOVERED,
@@ -72,3 +84,7 @@ def test_capability_profile_id_is_derived_from_sanitized_fields() -> None:
         )
         == "gopro-hero13-black-stock-2.10.00-usb-ncm-http"
     )
+
+
+def test_firmware_release_normalization_is_shared_domain_logic() -> None:
+    assert normalize_firmware_release("H24.01.02.10.00") == "2.10.00"

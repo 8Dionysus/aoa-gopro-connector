@@ -38,6 +38,7 @@
       "then": {
         "properties": {
           "control": {"const": "unleased"},
+          "network": {"const": "offline"},
           "previewing": {"const": false},
           "recording": {"const": false}
         }

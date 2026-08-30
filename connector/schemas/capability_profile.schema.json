@@ -151,8 +151,8 @@
         "posture"
       ],
       "properties": {
-        "published_version": {"type": "string", "minLength": 1},
-        "declared_python": {"type": "string", "minLength": 1},
+        "published_version": {"const": "0.22.0"},
+        "declared_python": {"const": ">=3.11,<3.14"},
         "posture": {"const": "optional_adapter"}
       }
     },

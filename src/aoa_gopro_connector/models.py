@@ -9,6 +9,16 @@ import re
 from .errors import ContractError
 
 
+def normalize_firmware_release(value: str) -> str:
+    """Normalize the numeric release encoded in a GoPro vendor version."""
+
+    parts = value.split(".")
+    if len(parts) >= 3 and all(part.isdigit() for part in parts[-3:]):
+        major, minor, patch = parts[-3:]
+        return f"{int(major)}.{minor.zfill(2)}.{patch.zfill(2)}"
+    return value
+
+
 def canonical_profile_id(
     *,
     model_name: str,
@@ -80,6 +90,8 @@ class CameraState:
         if self.presence is Presence.ABSENT:
             if self.control is not Control.UNLEASED:
                 raise ContractError("an absent camera cannot hold a lease")
+            if self.network is not Network.OFFLINE:
+                raise ContractError("an absent camera requires network=offline")
             if self.previewing or self.recording:
                 raise ContractError("an absent camera cannot preview or record")
         if self.control is Control.READY and self.power is not Power.ON:

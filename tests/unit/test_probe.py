@@ -358,6 +358,37 @@ def test_capability_profile_rejects_noncanonical_profile_id() -> None:
         validate_document("capability_profile", profile)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("published_version", "owned-camera.example.com"),
+        ("declared_python", "owned-camera.example.com"),
+    ],
+)
+def test_capability_profile_rejects_unpublished_sdk_metadata(
+    field: str,
+    value: str,
+) -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["sdk"][field] = value
+    profile = attach_digest(profile, "profile_digest")
+    with pytest.raises(ContractError, match=field):
+        validate_document("capability_profile", profile)
+
+
+def test_capability_profile_rejects_mismatched_normalized_firmware() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["camera"]["firmware_release_version"] = "9.99.99"
+    profile["profile_id"] = (
+        "gopro-hero13-black-stock-9.99.99-usb-ncm-http"
+    )
+    profile = attach_digest(profile, "profile_digest")
+    with pytest.raises(ContractError, match="firmware_release_version"):
+        validate_document("capability_profile", profile)
+
+
 def test_capability_profile_validation_rejects_stale_digest() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))

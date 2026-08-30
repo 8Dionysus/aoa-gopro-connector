@@ -9,7 +9,7 @@ from typing import Any
 from .adapters.base import ReadAdapter
 from .digest import attach_digest, verify_digest
 from .errors import ContractError
-from .models import canonical_profile_id
+from .models import canonical_profile_id, normalize_firmware_release
 from .redaction import assert_public_safe
 from .schema import validate_document
 
@@ -67,14 +67,6 @@ class ProbeContext:
             )
         if not self.observed_at or not self.protocol_version or not self.evidence_ref:
             raise ContractError("probe context is incomplete")
-
-
-def _normalized_firmware(value: str) -> str:
-    parts = value.split(".")
-    if len(parts) >= 3 and all(part.isdigit() for part in parts[-3:]):
-        major, minor, patch = parts[-3:]
-        return f"{int(major)}.{minor.zfill(2)}.{patch.zfill(2)}"
-    return value
 
 
 def _count_media(payload: dict[str, Any]) -> tuple[int, int]:
@@ -142,7 +134,7 @@ def build_capability_profile(
         raise ContractError("camera state lacks status/settings objects")
     media_group_count, media_item_count = _count_media(media)
 
-    release_version = _normalized_firmware(firmware_version)
+    release_version = normalize_firmware_release(firmware_version)
     profile_id = canonical_profile_id(
         model_name=str(model_name),
         firmware_posture=context.firmware_posture,

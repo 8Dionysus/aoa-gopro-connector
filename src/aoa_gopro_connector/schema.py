@@ -14,7 +14,7 @@ from jsonschema.exceptions import SchemaError
 from .digest import canonical_digest, verify_digest
 from .errors import ContractError
 from .json_io import strict_json_loads
-from .models import canonical_profile_id
+from .models import canonical_profile_id, normalize_firmware_release
 from .redaction import assert_public_safe
 
 
@@ -176,6 +176,13 @@ def _validate_event_freshness(document: dict[str, Any]) -> None:
 
 def _validate_capability_profile_identity(document: dict[str, Any]) -> None:
     camera = document["camera"]
+    expected_release = normalize_firmware_release(camera["firmware_vendor_version"])
+    if camera["firmware_release_version"] != expected_release:
+        raise ContractError(
+            "capability_profile validation failed at "
+            "camera.firmware_release_version: "
+            f"expected normalized value {expected_release!r}"
+        )
     expected = canonical_profile_id(
         model_name=camera["model_name"],
         firmware_posture=camera["firmware_posture"],
