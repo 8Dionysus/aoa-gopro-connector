@@ -235,33 +235,51 @@ def main() -> int:
         except Exception as exc:  # validator boundary reports every contract failure
             errors.append(f"schema {name} invalid: {exc}")
 
-    public_json_paths = [
-        *sorted((REPO_ROOT / "connector" / "fixtures").rglob("*.json")),
-        *sorted((REPO_ROOT / "connector" / "profiles").rglob("*.json")),
-    ]
-    for path in public_json_paths:
+    fixture_paths = sorted((REPO_ROOT / "connector" / "fixtures").rglob("*.json"))
+    profile_paths = sorted((REPO_ROOT / "connector" / "profiles").rglob("*.json"))
+    public_json_paths = [*fixture_paths, *profile_paths]
+    for path in profile_paths:
         value = _load_json(path, errors)
-        if value is not None:
-            for violation in public_safety_violations(value):
-                errors.append(f"public artifact unsafe {path.relative_to(REPO_ROOT)}: {violation}")
-
-    profile_path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
-    profile = _load_json(profile_path, errors) if profile_path.exists() else None
-    if isinstance(profile, dict):
+        if value is None:
+            continue
+        for violation in public_safety_violations(value):
+            errors.append(
+                f"public artifact unsafe {path.relative_to(REPO_ROOT)}: {violation}"
+            )
+        if not isinstance(value, dict):
+            errors.append(
+                f"capability profile is not an object: {path.relative_to(REPO_ROOT)}"
+            )
+            continue
         try:
-            validate_document("capability_profile", profile)
-            verify_digest(profile, "profile_digest")
+            validate_document("capability_profile", value)
+            verify_digest(value, "profile_digest")
         except Exception as exc:
-            errors.append(f"named capability profile invalid: {exc}")
+            errors.append(
+                f"capability profile invalid {path.relative_to(REPO_ROOT)}: {exc}"
+            )
 
-    fixture_path = REPO_ROOT / "connector/fixtures/hero13/stock-usb-ncm-read-only.json"
-    if fixture_path.exists():
+    for path in fixture_paths:
+        value = _load_json(path, errors)
+        if value is None:
+            continue
+        for violation in public_safety_violations(value):
+            errors.append(
+                f"public artifact unsafe {path.relative_to(REPO_ROOT)}: {violation}"
+            )
+        if not isinstance(value, dict):
+            errors.append(
+                f"replay fixture is not an object: {path.relative_to(REPO_ROOT)}"
+            )
+            continue
         try:
-            replay = ReplayReadAdapter.from_path(fixture_path)
+            replay = ReplayReadAdapter(value)
             replay_profile = build_capability_profile(replay, _fixture_context(replay))
             validate_document("capability_profile", replay_profile)
         except Exception as exc:
-            errors.append(f"replay contract failed: {exc}")
+            errors.append(
+                f"replay fixture invalid {path.relative_to(REPO_ROOT)}: {exc}"
+            )
 
     allowlist_path = REPO_ROOT / "connector/manifests/route_allowlist.yaml"
     allowlist = allowlist_path.read_text(encoding="utf-8") if allowlist_path.exists() else ""

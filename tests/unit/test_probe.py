@@ -58,9 +58,13 @@ def test_replay_builds_content_addressed_public_profile() -> None:
     }
 
 
-def test_replay_fixture_rejects_sensitive_keys() -> None:
+@pytest.mark.parametrize(
+    "key",
+    ["serial_number", "device_id", "device-id", "deviceId", "authorization"],
+)
+def test_replay_fixture_rejects_sensitive_keys(key: str) -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    value["responses"]["/gopro/camera/info"]["serial_number"] = "redacted"
+    value["responses"]["/gopro/camera/info"][key] = "unit-kitchen-hero-13"
     with pytest.raises(PublicSafetyError):
         ReplayReadAdapter(value)
 

@@ -27,6 +27,12 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
         {"value": "aabb.ccdd.eeff"},
         {"value": "AABBCCDDEEFF"},
         {"value": "C1234567890123"},
+        {"device_id": "unit-kitchen-hero-13"},
+        {"device-id": "unit-kitchen-hero-13"},
+        {"deviceId": "unit-kitchen-hero-13"},
+        {"cameraIdentifier": "unit-kitchen-hero-13"},
+        {"apiKey": "synthetic-secret"},
+        {"authorization-header": "synthetic-secret"},
     ],
 )
 def test_public_safety_rejects_identity(value: object) -> None:

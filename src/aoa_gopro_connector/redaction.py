@@ -29,7 +29,28 @@ SENSITIVE_KEYS = {
     "private_key",
     "password",
     "token",
+    "device_id",
+    "device_identifier",
+    "camera_id",
+    "camera_identifier",
+    "hardware_id",
+    "hardware_identifier",
+    "unique_id",
+    "uuid",
+    "guid",
+    "imei",
+    "authorization",
+    "authorization_header",
+    "auth",
+    "api_key",
+    "access_key",
+    "secret",
+    "client_id",
+    "client_secret",
+    "access_token",
+    "refresh_token",
 }
+SENSITIVE_KEY_FORMS = {key.replace("_", "") for key in SENSITIVE_KEYS}
 
 VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -105,6 +126,12 @@ def _string_safety_violations(value: str, *, path: str) -> list[str]:
     return violations
 
 
+def _is_sensitive_key(value: str) -> bool:
+    snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value)
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", snake_case).strip("_").casefold()
+    return normalized in SENSITIVE_KEYS or normalized.replace("_", "") in SENSITIVE_KEY_FORMS
+
+
 def public_safety_violations(
     value: Any,
     *,
@@ -130,7 +157,7 @@ def public_safety_violations(
                 key_text = str(key)
                 child_path = f"{item_path}.{key_text}"
                 item_segments = (*segments, key_text)
-                if key_text.casefold() in SENSITIVE_KEYS:
+                if _is_sensitive_key(key_text):
                     violations.append(f"{child_path}: forbidden identity/secret key")
                 violations.extend(
                     _string_safety_violations(key_text, path=f"{child_path} key")
