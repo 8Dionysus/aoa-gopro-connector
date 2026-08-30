@@ -19,6 +19,16 @@ OFFICIAL_EVIDENCE_REFS = [
     "https://gopro.github.io/OpenGoPro/http_2_0",
 ]
 
+DISCOVERY_MECHANISMS = (
+    "ble",
+    "cohn_registry",
+    "manual",
+    "mdns",
+    "replay",
+    "usb",
+    "wifi_scan",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ProbeContext:
@@ -34,6 +44,11 @@ class ProbeContext:
             raise ContractError(f"unsupported topology {self.topology!r}")
         if self.firmware_posture not in {"stock", "labs", "unknown"}:
             raise ContractError("firmware posture must be stock, labs, or unknown")
+        if any(
+            not isinstance(item, str) or item not in DISCOVERY_MECHANISMS
+            for item in self.discovery
+        ):
+            raise ContractError("probe discovery contains an unknown mechanism")
         if not self.observed_at or not self.protocol_version or not self.evidence_ref:
             raise ContractError("probe context is incomplete")
 

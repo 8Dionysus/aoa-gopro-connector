@@ -105,6 +105,25 @@ def test_invalid_port_is_a_contract_error(base_url: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://foo bar.local",
+        "http://-camera.local",
+        "http://camera..local",
+    ],
+)
+def test_malformed_mdns_hostname_is_a_contract_error(base_url: str) -> None:
+    with pytest.raises(ContractError, match="valid local mDNS"):
+        HTTPReadAdapter(base_url)
+
+
+def test_valid_mdns_hostname_is_accepted() -> None:
+    assert _validate_base_url("http://camera-name.local:8080") == (
+        "http://camera-name.local:8080"
+    )
+
+
+@pytest.mark.parametrize(
     "timeout_seconds",
     [float("nan"), float("inf"), float("-inf")],
 )

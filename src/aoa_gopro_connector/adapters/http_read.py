@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
 import math
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -15,6 +17,10 @@ from .base import ALLOWED_READ_PATHS
 
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+LOCAL_MDNS_HOST_PATTERN = re.compile(
+    r"(?i)^(?=.{1,253}\.?$)"
+    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+local\.?$"
+)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -36,8 +42,8 @@ def _validate_base_url(base_url: str) -> str:
     try:
         address = ipaddress.ip_address(hostname)
     except ValueError:
-        if not hostname.casefold().endswith(".local"):
-            raise ContractError("camera hostname must be a local mDNS name")
+        if not LOCAL_MDNS_HOST_PATTERN.fullmatch(hostname):
+            raise ContractError("camera hostname must be a valid local mDNS name")
     else:
         if not (address.is_private or address.is_link_local or address.is_loopback):
             raise ContractError("camera address must be private, link-local, or loopback")
@@ -76,7 +82,13 @@ class HTTPReadAdapter:
         try:
             with self._opener.open(request, timeout=self._timeout_seconds) as response:
                 payload = response.read(MAX_RESPONSE_BYTES + 1)
-        except (urllib.error.URLError, TimeoutError, OSError, TransportError) as exc:
+        except (
+            urllib.error.URLError,
+            http.client.InvalidURL,
+            TimeoutError,
+            OSError,
+            TransportError,
+        ) as exc:
             raise TransportError(f"read endpoint failed: {path}") from exc
         if len(payload) > MAX_RESPONSE_BYTES:
             raise TransportError(f"read endpoint exceeded size bound: {path}")

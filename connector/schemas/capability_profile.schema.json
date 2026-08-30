@@ -55,7 +55,17 @@
         "discovery": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "enum": [
+              "ble",
+              "cohn_registry",
+              "manual",
+              "mdns",
+              "replay",
+              "usb",
+              "wifi_scan"
+            ]
+          }
         },
         "http_read": {"const": "observed"}
       }

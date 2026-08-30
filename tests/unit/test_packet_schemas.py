@@ -73,6 +73,46 @@ def test_operation_plan_contract() -> None:
 
 
 @pytest.mark.parametrize(
+    "preconditions",
+    [
+        [
+            {
+                "kind": "battery",
+                "expected": "sufficient",
+                "observation_ref": "observation:fixture-battery",
+            }
+        ],
+        [
+            {
+                "kind": "lease",
+                "expected": "missing",
+                "observation_ref": "observation:fixture-lease",
+            }
+        ],
+        [
+            {
+                "kind": "lease",
+                "expected": "held",
+                "observation_ref": "observation:fixture-lease-one",
+            },
+            {
+                "kind": "lease",
+                "expected": "held",
+                "observation_ref": "observation:fixture-lease-two",
+            },
+        ],
+    ],
+)
+def test_operation_plan_requires_one_held_lease(
+    preconditions: list[dict[str, object]],
+) -> None:
+    plan = _operation_plan()
+    plan["preconditions"] = preconditions
+    with pytest.raises(ContractError, match="preconditions"):
+        validate_document("operation_plan", plan)
+
+
+@pytest.mark.parametrize(
     "effect_kind",
     [
         "firmware.install",
