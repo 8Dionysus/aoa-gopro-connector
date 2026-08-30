@@ -168,3 +168,17 @@ def test_recovery_receipt_accepts_attempted_recovery() -> None:
         "result": "recovered",
     }
     validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_finished_at_before_started_at() -> None:
+    receipt = _receipt()
+    receipt["finished_at"] = "2026-08-30T04:59:59Z"
+    with pytest.raises(ContractError, match="finished_at"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_receipt_timeline_compares_instants_across_offsets() -> None:
+    receipt = _receipt()
+    receipt["started_at"] = "2026-08-30T05:00:00+01:00"
+    receipt["finished_at"] = "2026-08-30T04:00:00Z"
+    validate_document("operation_receipt", receipt)

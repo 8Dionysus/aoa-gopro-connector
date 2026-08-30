@@ -51,6 +51,36 @@ SENSITIVE_KEYS = {
     "refresh_token",
 }
 SENSITIVE_KEY_FORMS = {key.replace("_", "") for key in SENSITIVE_KEYS}
+SENSITIVE_KEY_COMPONENTS = {
+    "auth",
+    "authorization",
+    "certificate",
+    "credential",
+    "credentials",
+    "guid",
+    "imei",
+    "mac",
+    "password",
+    "secret",
+    "serial",
+    "ssid",
+    "token",
+    "uuid",
+}
+SENSITIVE_KEY_COMPONENT_PAIRS = {
+    ("access", "key"),
+    ("account", "id"),
+    ("api", "key"),
+    ("camera", "id"),
+    ("client", "id"),
+    ("device", "id"),
+    ("hardware", "id"),
+    ("ip", "address"),
+    ("network", "address"),
+    ("private", "key"),
+    ("unique", "id"),
+    ("user", "id"),
+}
 
 VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -129,7 +159,14 @@ def _string_safety_violations(value: str, *, path: str) -> list[str]:
 def _is_sensitive_key(value: str) -> bool:
     snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value)
     normalized = re.sub(r"[^A-Za-z0-9]+", "_", snake_case).strip("_").casefold()
-    return normalized in SENSITIVE_KEYS or normalized.replace("_", "") in SENSITIVE_KEY_FORMS
+    components = tuple(part for part in normalized.split("_") if part)
+    component_pairs = set(zip(components, components[1:]))
+    return (
+        normalized in SENSITIVE_KEYS
+        or normalized.replace("_", "") in SENSITIVE_KEY_FORMS
+        or any(part in SENSITIVE_KEY_COMPONENTS for part in components)
+        or bool(component_pairs & SENSITIVE_KEY_COMPONENT_PAIRS)
+    )
 
 
 def public_safety_violations(

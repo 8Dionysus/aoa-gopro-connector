@@ -33,6 +33,9 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
         {"cameraIdentifier": "unit-kitchen-hero-13"},
         {"apiKey": "synthetic-secret"},
         {"authorization-header": "synthetic-secret"},
+        {"wifiPassword": "synthetic-secret"},
+        {"wifiSsid": "synthetic-network"},
+        {"authToken": "synthetic-secret"},
     ],
 )
 def test_public_safety_rejects_identity(value: object) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import os
 import sys
 from pathlib import Path
@@ -66,7 +67,33 @@ def load_schema(name: str) -> dict[str, Any]:
     return value
 
 
+def _rfc3339_datetime(value: str, *, field: str) -> datetime:
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ContractError(
+            f"operation_receipt validation failed at {field}: invalid date-time"
+        ) from exc
+    if parsed.tzinfo is None:
+        raise ContractError(
+            f"operation_receipt validation failed at {field}: timezone is required"
+        )
+    return parsed
+
+
+def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
+    started_at = _rfc3339_datetime(document["started_at"], field="started_at")
+    finished_at = _rfc3339_datetime(document["finished_at"], field="finished_at")
+    if finished_at < started_at:
+        raise ContractError(
+            "operation_receipt validation failed at finished_at: "
+            "must not precede started_at"
+        )
+
+
 def validate_document(name: str, document: Any) -> None:
+    normalized_name = name.removesuffix(".schema.json")
     validator = Draft202012Validator(
         load_schema(name),
         format_checker=FormatChecker(),
@@ -76,5 +103,7 @@ def validate_document(name: str, document: Any) -> None:
         first = errors[0]
         location = ".".join(str(part) for part in first.path) or "$"
         raise ContractError(f"{name} validation failed at {location}: {first.message}")
-    if name.removesuffix(".schema.json") == "capability_profile":
+    if normalized_name == "capability_profile":
         assert_public_safe(document)
+    elif normalized_name == "operation_receipt":
+        _validate_operation_receipt_timeline(document)

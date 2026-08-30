@@ -60,7 +60,16 @@ def test_replay_builds_content_addressed_public_profile() -> None:
 
 @pytest.mark.parametrize(
     "key",
-    ["serial_number", "device_id", "device-id", "deviceId", "authorization"],
+    [
+        "serial_number",
+        "device_id",
+        "device-id",
+        "deviceId",
+        "authorization",
+        "wifiPassword",
+        "wifiSsid",
+        "authToken",
+    ],
 )
 def test_replay_fixture_rejects_sensitive_keys(key: str) -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
@@ -100,14 +109,15 @@ def test_replay_snapshot_is_immutable_from_public_aliases() -> None:
     assert adapter.fixture_digest == REPLAY_FIXTURE_DIGEST
 
 
-def test_probe_rejects_free_form_protocol_version() -> None:
+@pytest.mark.parametrize("protocol_version", ["kitchen-hero13", "1.2.3.4"])
+def test_probe_rejects_free_form_protocol_version(protocol_version: str) -> None:
     adapter = ReplayReadAdapter.from_path(FIXTURE)
     context = _context(adapter)
     invalid_context = ProbeContext(
         observed_at=context.observed_at,
         topology=context.topology,
         discovery=context.discovery,
-        protocol_version="kitchen-hero13",
+        protocol_version=protocol_version,
         firmware_posture=context.firmware_posture,
         evidence_ref=context.evidence_ref,
     )
@@ -227,4 +237,12 @@ def test_capability_profile_rejects_mismatched_evidence_posture() -> None:
     profile = json.loads(path.read_text(encoding="utf-8"))
     profile["posture"] = "sanitized_replay"
     with pytest.raises(ContractError, match="evidence_refs.2"):
+        validate_document("capability_profile", profile)
+
+
+def test_capability_profile_rejects_ipv4_shaped_protocol_version() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["api"]["protocol_version"] = "1.2.3.4"
+    with pytest.raises(ContractError, match="api.protocol_version"):
         validate_document("capability_profile", profile)
