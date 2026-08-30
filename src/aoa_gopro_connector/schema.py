@@ -13,6 +13,7 @@ from jsonschema.exceptions import SchemaError
 
 from .errors import ContractError
 from .json_io import strict_json_loads
+from .models import canonical_profile_id
 from .redaction import assert_public_safe
 
 
@@ -133,6 +134,21 @@ def _validate_event_freshness(document: dict[str, Any]) -> None:
         )
 
 
+def _validate_capability_profile_identity(document: dict[str, Any]) -> None:
+    camera = document["camera"]
+    expected = canonical_profile_id(
+        model_name=camera["model_name"],
+        firmware_posture=camera["firmware_posture"],
+        firmware_release_version=camera["firmware_release_version"],
+        topology=document["transport"]["topology"],
+    )
+    if document["profile_id"] != expected:
+        raise ContractError(
+            "capability_profile validation failed at profile_id: "
+            f"expected canonical value {expected!r}"
+        )
+
+
 def validate_document(name: str, document: Any) -> None:
     normalized_name = name.removesuffix(".schema.json")
     validator = Draft202012Validator(
@@ -145,6 +161,7 @@ def validate_document(name: str, document: Any) -> None:
         location = ".".join(str(part) for part in first.path) or "$"
         raise ContractError(f"{name} validation failed at {location}: {first.message}")
     if normalized_name == "capability_profile":
+        _validate_capability_profile_identity(document)
         assert_public_safe(document)
     elif normalized_name == "operation_receipt":
         _validate_operation_receipt_timeline(document)

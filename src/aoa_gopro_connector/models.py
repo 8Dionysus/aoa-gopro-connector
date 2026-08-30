@@ -4,8 +4,26 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import StrEnum
+import re
 
 from .errors import ContractError
+
+
+def canonical_profile_id(
+    *,
+    model_name: str,
+    firmware_posture: str,
+    firmware_release_version: str,
+    topology: str,
+) -> str:
+    """Derive the public profile identifier from sanitized capability fields."""
+
+    model_slug = re.sub(r"[^a-z0-9]+", "-", model_name.casefold()).strip("-")
+    topology_slug = topology.replace("_", "-")
+    return (
+        f"gopro-{model_slug}-{firmware_posture}-{firmware_release_version}-"
+        f"{topology_slug}"
+    )
 
 
 class Presence(StrEnum):

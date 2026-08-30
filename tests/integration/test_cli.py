@@ -195,6 +195,24 @@ def test_schema_cli_rejects_nonstandard_numeric_constants(
     assert payload["error_type"] == "JSONDecodeError"
 
 
+def test_schema_cli_rejects_oversized_integer(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    packet_path = tmp_path / "oversized-integer.json"
+    packet_path.write_text(
+        '{"value": ' + "9" * 5000 + "}",
+        encoding="utf-8",
+    )
+
+    assert main(["schema", "validate", "event", str(packet_path)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "JSONDecodeError"
+
+
 @pytest.mark.parametrize("discovery", ["mdns", None])
 def test_replay_cli_rejects_non_list_discovery(
     discovery: object,

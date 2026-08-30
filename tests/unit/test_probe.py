@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from aoa_gopro_connector.adapters import ReplayReadAdapter
-from aoa_gopro_connector.digest import verify_digest
+from aoa_gopro_connector.digest import attach_digest, verify_digest
 from aoa_gopro_connector.errors import ContractError, PublicSafetyError
 from aoa_gopro_connector.probe import ProbeContext, build_capability_profile
 from aoa_gopro_connector.redaction import assert_public_safe
@@ -306,4 +306,13 @@ def test_capability_profile_rejects_ipv4_shaped_protocol_version() -> None:
     profile = json.loads(path.read_text(encoding="utf-8"))
     profile["api"]["protocol_version"] = "1.2.3.4"
     with pytest.raises(ContractError, match="api.protocol_version"):
+        validate_document("capability_profile", profile)
+
+
+def test_capability_profile_rejects_noncanonical_profile_id() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["profile_id"] = "gopro-kitchen-hero13"
+    profile = attach_digest(profile, "profile_digest")
+    with pytest.raises(ContractError, match="profile_id"):
         validate_document("capability_profile", profile)

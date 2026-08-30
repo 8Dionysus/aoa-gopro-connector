@@ -7,6 +7,9 @@ import math
 from typing import Any, NoReturn
 
 
+MAX_JSON_INTEGER_DIGITS = 256
+
+
 def _reject_nonstandard_constant(value: str) -> NoReturn:
     raise json.JSONDecodeError(
         f"non-standard JSON numeric constant {value!r}",
@@ -26,6 +29,20 @@ def _parse_finite_float(value: str) -> float:
     return parsed
 
 
+def _parse_bounded_int(value: str) -> int:
+    digits = value[1:] if value.startswith("-") else value
+    if len(digits) > MAX_JSON_INTEGER_DIGITS:
+        raise json.JSONDecodeError(
+            f"JSON integer exceeds {MAX_JSON_INTEGER_DIGITS}-digit limit",
+            value,
+            0,
+        )
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise json.JSONDecodeError("invalid JSON integer", value, 0) from exc
+
+
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -43,6 +60,7 @@ def strict_json_loads(value: str | bytes | bytearray) -> Any:
             value,
             parse_constant=_reject_nonstandard_constant,
             parse_float=_parse_finite_float,
+            parse_int=_parse_bounded_int,
             object_pairs_hook=_unique_object,
         )
     except RecursionError as exc:

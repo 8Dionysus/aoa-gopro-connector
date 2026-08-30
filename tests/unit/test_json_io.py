@@ -20,6 +20,12 @@ def test_strict_json_loads_rejects_float_overflow() -> None:
         strict_json_loads('{"value": 1e999}')
 
 
+def test_strict_json_loads_rejects_oversized_integer() -> None:
+    encoded = '{"value": ' + "9" * 5000 + "}"
+    with pytest.raises(json.JSONDecodeError, match="integer exceeds"):
+        strict_json_loads(encoded)
+
+
 def test_strict_json_loads_rejects_duplicate_object_keys() -> None:
     with pytest.raises(json.JSONDecodeError, match="duplicate JSON object key"):
         strict_json_loads('{"value": 1, "value": 2}')

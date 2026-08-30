@@ -9,6 +9,7 @@ from typing import Any
 from .adapters.base import ReadAdapter
 from .digest import attach_digest, verify_digest
 from .errors import ContractError
+from .models import canonical_profile_id
 from .redaction import assert_public_safe
 from .schema import validate_document
 
@@ -74,10 +75,6 @@ def _normalized_firmware(value: str) -> str:
         major, minor, patch = parts[-3:]
         return f"{int(major)}.{minor.zfill(2)}.{patch.zfill(2)}"
     return value
-
-
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
 
 
 def _count_media(payload: dict[str, Any]) -> tuple[int, int]:
@@ -146,9 +143,11 @@ def build_capability_profile(
     media_group_count, media_item_count = _count_media(media)
 
     release_version = _normalized_firmware(firmware_version)
-    profile_id = (
-        f"gopro-{_slug(str(model_name))}-{context.firmware_posture}-"
-        f"{release_version}-{context.topology.replace('_', '-')}"
+    profile_id = canonical_profile_id(
+        model_name=str(model_name),
+        firmware_posture=context.firmware_posture,
+        firmware_release_version=release_version,
+        topology=context.topology,
     )
     capabilities = {
         "read_camera_info": "observed",

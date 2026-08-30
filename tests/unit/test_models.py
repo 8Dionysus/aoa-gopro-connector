@@ -10,6 +10,7 @@ from aoa_gopro_connector.models import (
     Network,
     Power,
     Presence,
+    canonical_profile_id,
 )
 from aoa_gopro_connector.schema import validate_document
 
@@ -59,3 +60,15 @@ def test_schema_rejects_control_ready_without_power_on() -> None:
     document["power"] = "off"
     with pytest.raises(ContractError, match="power"):
         validate_document("camera_state", document)
+
+
+def test_capability_profile_id_is_derived_from_sanitized_fields() -> None:
+    assert (
+        canonical_profile_id(
+            model_name="HERO13 Black",
+            firmware_posture="stock",
+            firmware_release_version="2.10.00",
+            topology="usb_ncm_http",
+        )
+        == "gopro-hero13-black-stock-2.10.00-usb-ncm-http"
+    )
