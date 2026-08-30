@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/capability_profile.schema.json",
+  "title": "AoA GoPro capability profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "profile_digest",
+    "observed_at",
+    "posture",
+    "device_ref",
+    "camera",
+    "transport",
+    "api",
+    "observations",
+    "capabilities",
+    "sdk",
+    "privacy",
+    "limitations",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_capability_profile_v1"},
+    "profile_id": {"type": "string", "pattern": "^gopro-[a-z0-9][a-z0-9.-]+$"},
+    "profile_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "posture": {"enum": ["sanitized_replay", "live_read_only"]},
+    "device_ref": {"const": "device:redacted"},
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_name",
+        "model_number",
+        "firmware_vendor_version",
+        "firmware_release_version",
+        "firmware_posture"
+      ],
+      "properties": {
+        "model_name": {"type": "string", "minLength": 1},
+        "model_number": {"type": "string", "minLength": 1},
+        "firmware_vendor_version": {"type": "string", "minLength": 1},
+        "firmware_release_version": {"type": "string", "minLength": 1},
+        "firmware_posture": {"enum": ["stock", "labs", "unknown"]}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topology", "discovery", "http_read"],
+      "properties": {
+        "topology": {"enum": ["usb_ncm_http", "wifi_ap_http", "cohn_http"]},
+        "discovery": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "http_read": {"const": "observed"}
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "spec_version", "protocol_version"],
+      "properties": {
+        "family": {"const": "OpenGoPro"},
+        "spec_version": {"type": "string", "minLength": 1},
+        "protocol_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status_key_count",
+        "setting_key_count",
+        "media_group_count",
+        "media_item_count"
+      ],
+      "properties": {
+        "status_key_count": {"type": "integer", "minimum": 0},
+        "setting_key_count": {"type": "integer", "minimum": 0},
+        "media_group_count": {"type": "integer", "minimum": 0},
+        "media_item_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 3,
+      "additionalProperties": {
+        "enum": ["observed", "not_observed", "unsupported", "unknown"]
+      }
+    },
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "published_version",
+        "declared_python",
+        "current_python",
+        "current_python_compatible",
+        "posture"
+      ],
+      "properties": {
+        "published_version": {"type": "string", "minLength": 1},
+        "declared_python": {"type": "string", "minLength": 1},
+        "current_python": {"type": "string", "minLength": 1},
+        "current_python_compatible": {"type": "boolean"},
+        "posture": {"const": "optional_adapter"}
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_responses_retained",
+        "device_identifiers_retained",
+        "network_identity_retained",
+        "media_names_retained"
+      ],
+      "properties": {
+        "raw_responses_retained": {"const": false},
+        "device_identifiers_retained": {"const": false},
+        "network_identity_retained": {"const": false},
+        "media_names_retained": {"const": false}
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

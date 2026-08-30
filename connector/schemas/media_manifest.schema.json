@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/media_manifest.schema.json",
+  "title": "AoA GoPro media manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "device_ref",
+    "observed_at",
+    "camera_media_ref",
+    "media_kind",
+    "size_bytes",
+    "source_checksum",
+    "ingest_state",
+    "original_immutable",
+    "retention_class",
+    "derivatives",
+    "provenance_refs",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_media_manifest_v1"},
+    "manifest_id": {"type": "string", "pattern": "^media-manifest:[a-z0-9][a-z0-9._:-]+$"},
+    "device_ref": {"type": "string", "pattern": "^device:[a-z0-9][a-z0-9._:-]+$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "camera_media_ref": {"type": "string", "minLength": 1},
+    "media_kind": {"enum": ["video", "photo", "chapter", "unknown"]},
+    "size_bytes": {"type": ["integer", "null"], "minimum": 0},
+    "source_checksum": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ingest_state": {"enum": ["inventory_only", "transferring", "complete", "failed", "indeterminate"]},
+    "original_immutable": {"const": true},
+    "retention_class": {"enum": ["inventory_only", "ephemeral", "operator_retained", "policy_retained"]},
+    "derivatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "artifact_ref", "checksum", "provenance_ref"],
+        "properties": {
+          "kind": {"enum": ["thm", "lrv", "gpmf", "proxy", "transcript", "semantic"]},
+          "artifact_ref": {"type": "string", "minLength": 1},
+          "checksum": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "provenance_ref": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "provenance_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

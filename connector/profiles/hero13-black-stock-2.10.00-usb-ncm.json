@@ -1,0 +1,72 @@
+{
+  "api": {
+    "family": "OpenGoPro",
+    "protocol_version": "1",
+    "spec_version": "2.0"
+  },
+  "camera": {
+    "firmware_posture": "stock",
+    "firmware_release_version": "2.10.00",
+    "firmware_vendor_version": "H24.01.02.10.00",
+    "model_name": "HERO13 Black",
+    "model_number": "65"
+  },
+  "capabilities": {
+    "ble_discovery_and_wake": "not_observed",
+    "camera_effects": "not_observed",
+    "cohn_control": "not_observed",
+    "disconnect_recovery": "not_observed",
+    "gpmf": "not_observed",
+    "hilight": "not_observed",
+    "list_media": "observed",
+    "media_transfer": "not_observed",
+    "preview": "not_observed",
+    "read_camera_info": "observed",
+    "read_camera_state": "observed",
+    "recording": "not_observed",
+    "wifi_ap_control": "not_observed"
+  },
+  "device_ref": "device:redacted",
+  "evidence_refs": [
+    "https://gopro.github.io/OpenGoPro/",
+    "https://gopro.github.io/OpenGoPro/http_2_0",
+    "local-live-read-only:hero13-stock-usb-ncm-phase0-20260829"
+  ],
+  "limitations": [
+    "Read-only observation does not establish control readiness.",
+    "No preview, recording, transfer, recovery, or endurance operation was attempted.",
+    "The profile applies only to the named model, firmware, and topology."
+  ],
+  "observations": {
+    "media_group_count": 0,
+    "media_item_count": 0,
+    "setting_key_count": 120,
+    "status_key_count": 79
+  },
+  "observed_at": "2026-08-30T04:58:16Z",
+  "posture": "live_read_only",
+  "privacy": {
+    "device_identifiers_retained": false,
+    "media_names_retained": false,
+    "network_identity_retained": false,
+    "raw_responses_retained": false
+  },
+  "profile_digest": "sha256:bb273b497e28e322160bb6e715aa1354f6a8e07cd6513e0805a33129c78df282",
+  "profile_id": "gopro-hero13-black-stock-2.10.00-usb-ncm-http",
+  "schema_version": "aoa_gopro_capability_profile_v1",
+  "sdk": {
+    "current_python": "3.14.7",
+    "current_python_compatible": false,
+    "declared_python": ">=3.11,<3.14",
+    "posture": "optional_adapter",
+    "published_version": "0.22.0"
+  },
+  "transport": {
+    "discovery": [
+      "mdns",
+      "usb"
+    ],
+    "http_read": "observed",
+    "topology": "usb_ncm_http"
+  }
+}

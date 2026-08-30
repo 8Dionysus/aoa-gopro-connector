@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/aoa-gopro-connector/schemas/camera_state.schema.json",
+  "title": "AoA GoPro composed camera state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "presence",
+    "power",
+    "control",
+    "network",
+    "previewing",
+    "recording",
+    "media",
+    "health",
+    "degraded_reasons"
+  ],
+  "properties": {
+    "schema_version": {"const": "aoa_gopro_camera_state_v1"},
+    "presence": {"enum": ["absent", "discovered"]},
+    "power": {"enum": ["unknown", "off", "waking", "on", "sleeping"]},
+    "control": {"enum": ["unleased", "leased", "ready"]},
+    "network": {"enum": ["offline", "discoverable", "ready"]},
+    "previewing": {"type": "boolean"},
+    "recording": {"type": "boolean"},
+    "media": {"enum": ["idle", "finalizing", "transferring"]},
+    "health": {"enum": ["healthy", "degraded", "recovering", "needs_operator"]},
+    "degraded_reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"presence": {"const": "absent"}}},
+      "then": {
+        "properties": {
+          "control": {"const": "unleased"},
+          "previewing": {"const": false},
+          "recording": {"const": false}
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {"properties": {"previewing": {"const": true}}, "required": ["previewing"]},
+          {"properties": {"recording": {"const": true}}, "required": ["recording"]}
+        ]
+      },
+      "then": {
+        "properties": {
+          "control": {"const": "ready"},
+          "network": {"const": "ready"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"health": {"const": "healthy"}}},
+      "then": {"properties": {"degraded_reasons": {"maxItems": 0}}},
+      "else": {"properties": {"degraded_reasons": {"minItems": 1}}}
+    }
+  ]
+}
