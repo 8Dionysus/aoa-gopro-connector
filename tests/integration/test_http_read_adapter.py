@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -95,6 +96,12 @@ def test_public_address_is_rejected() -> None:
         HTTPReadAdapter("http://8.8.8.8")
 
 
+@pytest.mark.parametrize("base_url", ["http://0.0.0.0", "http://[::]"])
+def test_unspecified_address_is_rejected(base_url: str) -> None:
+    with pytest.raises(ContractError, match="private"):
+        HTTPReadAdapter(base_url)
+
+
 @pytest.mark.parametrize(
     "base_url",
     ["http://127.0.0.1:abc", "http://127.0.0.1:70000"],
@@ -117,10 +124,42 @@ def test_malformed_mdns_hostname_is_a_contract_error(base_url: str) -> None:
         HTTPReadAdapter(base_url)
 
 
-def test_valid_mdns_hostname_is_accepted() -> None:
+def test_valid_mdns_hostname_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.2", 8080))
+        ],
+    )
     assert _validate_base_url("http://camera-name.local:8080") == (
         "http://camera-name.local:8080"
     )
+
+
+def test_mdns_hostname_resolving_public_address_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 80))
+        ],
+    )
+    with pytest.raises(ContractError, match="outside local"):
+        HTTPReadAdapter("http://camera.local")
+
+
+def test_unresolved_mdns_hostname_is_a_contract_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_resolution(*args: object, **kwargs: object) -> object:
+        raise socket.gaierror("not found")
+
+    monkeypatch.setattr(socket, "getaddrinfo", fail_resolution)
+    with pytest.raises(ContractError, match="could not be resolved"):
+        HTTPReadAdapter("http://camera.local")
 
 
 @pytest.mark.parametrize(

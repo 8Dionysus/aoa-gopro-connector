@@ -15,12 +15,18 @@ from . import __version__
 from .adapters import HTTPReadAdapter, ReplayReadAdapter
 from .config import resolve_storage_roots
 from .errors import ContractError, GoProConnectorError
+from .json_io import strict_json_dumps, strict_json_loads
 from .probe import ProbeContext, build_capability_profile
 from .schema import SCHEMA_NAMES, load_schema, schema_root, validate_document
 
 
+LIVE_EVIDENCE_REF = "local-live-read-only:operator-authorized-camera"
+
+
 def _json_text(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    return (
+        strict_json_dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    )
 
 
 def _emit(value: Any, output: str | None = None) -> None:
@@ -102,15 +108,16 @@ def _replay_probe(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _live_probe(args: argparse.Namespace) -> dict[str, Any]:
-    adapter = HTTPReadAdapter(args.base_url, timeout_seconds=args.timeout)
     context = ProbeContext(
         observed_at=args.observed_at or _utc_now(),
         topology=args.topology,
         discovery=tuple(args.discovery),
         protocol_version=args.protocol_version,
         firmware_posture=args.firmware_posture,
-        evidence_ref=f"local-live-read-only:{args.evidence_id}",
+        evidence_ref=LIVE_EVIDENCE_REF,
     )
+    context.validate()
+    adapter = HTTPReadAdapter(args.base_url, timeout_seconds=args.timeout)
     return build_capability_profile(adapter, context)
 
 
@@ -143,7 +150,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("stock", "labs", "unknown"),
         default="unknown",
     )
-    live.add_argument("--evidence-id", default="operator-authorized-camera")
     live.add_argument("--observed-at")
     live.add_argument("--timeout", type=float, default=5.0)
     live.add_argument("--output")
@@ -166,7 +172,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "probe":
             _emit(_live_probe(args), args.output)
         elif args.command == "schema" and args.schema_command == "validate":
-            document = json.loads(Path(args.document).read_text(encoding="utf-8"))
+            document = strict_json_loads(
+                Path(args.document).read_text(encoding="utf-8")
+            )
             validate_document(args.schema_name, document)
             _emit(
                 {

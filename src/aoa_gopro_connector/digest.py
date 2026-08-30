@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from typing import Any, Mapping
 
 from .errors import ContractError
+from .json_io import strict_json_dumps
 
 
 ZERO_DIGEST = "sha256:" + "0" * 64
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(
+    return strict_json_dumps(
         value,
         ensure_ascii=False,
         sort_keys=True,

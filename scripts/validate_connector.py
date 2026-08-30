@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from aoa_gopro_connector.adapters import ReplayReadAdapter
 from aoa_gopro_connector.cli import build_parser
 from aoa_gopro_connector.digest import verify_digest
+from aoa_gopro_connector.json_io import strict_json_loads
 from aoa_gopro_connector.probe import ProbeContext, build_capability_profile
 from aoa_gopro_connector.redaction import public_safety_violations
 from aoa_gopro_connector.schema import SCHEMA_NAMES, load_schema, validate_document
@@ -53,6 +54,7 @@ REQUIRED_FILES = [
     "stats/README.md",
     "src/aoa_gopro_connector/__init__.py",
     "src/aoa_gopro_connector/cli.py",
+    "src/aoa_gopro_connector/json_io.py",
     "src/aoa_gopro_connector/models.py",
     "src/aoa_gopro_connector/probe.py",
     "src/aoa_gopro_connector/redaction.py",
@@ -138,7 +140,7 @@ COMMAND_LINE_RE = re.compile(
 
 def _load_json(path: Path, errors: list[str]) -> object | None:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return strict_json_loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         errors.append(f"invalid JSON {path.relative_to(REPO_ROOT)}: {exc}")
         return None

@@ -52,6 +52,28 @@ def test_replay_fixture_rejects_sensitive_keys() -> None:
         ReplayReadAdapter(value)
 
 
+def test_replay_fixture_rejects_non_finite_values() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/camera/state"]["status"]["8"] = float("nan")
+    with pytest.raises(ContractError, match="non-JSON values"):
+        ReplayReadAdapter(value)
+
+
+def test_probe_rejects_free_form_protocol_version() -> None:
+    adapter = ReplayReadAdapter.from_path(FIXTURE)
+    context = _context(adapter)
+    invalid_context = ProbeContext(
+        observed_at=context.observed_at,
+        topology=context.topology,
+        discovery=context.discovery,
+        protocol_version="kitchen-hero13",
+        firmware_posture=context.firmware_posture,
+        evidence_ref=context.evidence_ref,
+    )
+    with pytest.raises(ContractError, match="protocol version"):
+        build_capability_profile(adapter, invalid_context)
+
+
 def test_probe_rejects_media_response_without_inventory() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["responses"]["/gopro/media/list"] = {"id": "fixture"}

@@ -10,6 +10,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .errors import ContractError
+from .json_io import strict_json_loads
 
 
 SCHEMA_NAMES = (
@@ -51,7 +52,7 @@ def load_schema(name: str) -> dict[str, Any]:
 
     path = schema_path(name)
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = strict_json_loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ContractError(f"invalid schema file {path.name}") from exc
     if not isinstance(value, dict):

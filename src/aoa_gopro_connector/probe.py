@@ -28,6 +28,7 @@ DISCOVERY_MECHANISMS = (
     "usb",
     "wifi_scan",
 )
+PROTOCOL_VERSION_PATTERN = re.compile(r"^(?:unknown|[0-9]+(?:\.[0-9]+)*)$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,8 @@ class ProbeContext:
             for item in self.discovery
         ):
             raise ContractError("probe discovery contains an unknown mechanism")
+        if not PROTOCOL_VERSION_PATTERN.fullmatch(self.protocol_version):
+            raise ContractError("probe protocol version must be numeric or unknown")
         if not self.observed_at or not self.protocol_version or not self.evidence_ref:
             raise ContractError("probe context is incomplete")
 

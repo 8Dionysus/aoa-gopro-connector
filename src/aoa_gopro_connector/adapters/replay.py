@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from ..errors import ContractError
+from ..json_io import strict_json_dumps, strict_json_loads
 from ..redaction import assert_public_safe
 from .base import ALLOWED_READ_PATHS
 
 
 class ReplayReadAdapter:
     def __init__(self, fixture: dict[str, Any]) -> None:
+        try:
+            strict_json_dumps(fixture)
+        except (TypeError, ValueError) as exc:
+            raise ContractError("replay fixture contains non-JSON values") from exc
         if fixture.get("schema_version") != "aoa_gopro_read_replay_fixture_v1":
             raise ContractError("unsupported replay fixture schema")
         responses = fixture.get("responses")
@@ -32,7 +38,7 @@ class ReplayReadAdapter:
     def from_path(cls, path: str | Path) -> "ReplayReadAdapter":
         fixture_path = Path(path)
         try:
-            fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+            fixture = strict_json_loads(fixture_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ContractError(f"invalid replay fixture: {fixture_path}") from exc
         if not isinstance(fixture, dict):
@@ -45,4 +51,4 @@ class ReplayReadAdapter:
         value = self._responses[path]
         if not isinstance(value, dict):
             raise ContractError(f"replay response is not an object: {path}")
-        return json.loads(json.dumps(value))
+        return deepcopy(value)

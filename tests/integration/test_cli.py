@@ -85,6 +85,82 @@ def test_probe_cli_rejects_identifying_discovery_value(capsys) -> None:
     assert payload["error_type"] == "ContractError"
 
 
+def test_probe_cli_has_no_free_form_evidence_id(capsys) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(
+            [
+                "probe",
+                "--base-url",
+                "http://127.0.0.1",
+                "--evidence-id",
+                "kitchen-hero13",
+            ]
+        )
+    assert raised.value.code == 2
+    assert "unrecognized arguments: --evidence-id" in capsys.readouterr().err
+
+
+def test_probe_cli_rejects_identifying_protocol_version(capsys) -> None:
+    assert (
+        main(
+            [
+                "probe",
+                "--base-url",
+                "http://127.0.0.1",
+                "--protocol-version",
+                "kitchen-hero13",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ContractError"
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_schema_cli_rejects_nonstandard_numeric_constants(
+    constant: str,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    document = {
+        "schema_version": "aoa_gopro_event_v1",
+        "event_id": "event:fixture-discovered",
+        "event_type": "camera.discovered",
+        "device_ref": "device:fixture-camera",
+        "causal_operation_id": None,
+        "wall_time": "2026-08-30T05:00:00Z",
+        "monotonic_ns": 1,
+        "observed_source": "fixture",
+        "capability_profile_digest": "sha256:" + "1" * 64,
+        "confidence": None,
+        "freshness": {
+            "observed_at": "2026-08-30T05:00:00Z",
+            "expires_at": None,
+            "posture": "current",
+        },
+        "payload": {},
+        "evidence_refs": ["fixture:event"],
+        "event_digest": "sha256:" + "0" * 64,
+    }
+    encoded = json.dumps(document).replace(
+        '"confidence": null',
+        f'"confidence": {constant}',
+    )
+    packet_path = tmp_path / "event.json"
+    packet_path.write_text(encoded, encoding="utf-8")
+
+    assert main(["schema", "validate", "event", str(packet_path)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "JSONDecodeError"
+
+
 @pytest.mark.parametrize("discovery", ["mdns", None])
 def test_replay_cli_rejects_non_list_discovery(
     discovery: object,
