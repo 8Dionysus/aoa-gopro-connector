@@ -124,7 +124,7 @@ def test_repository_validator_rejects_force_tracked_private_media(
         )
 
 
-def test_repository_validator_rejects_disguised_media_signature(
+def test_repository_validator_rejects_disguised_media_signatures(
     tmp_path: Path,
 ) -> None:
     repo_copy = tmp_path / "repo"
@@ -140,10 +140,19 @@ def test_repository_validator_rejects_disguised_media_signature(
         ),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
-    disguised_media = repo_copy / "tests/disguised-media.bin"
-    disguised_media.write_bytes(bytes((0x1A, 0x45, 0xDF, 0xA3)) + b"synthetic")
+    disguised_media = {
+        "tests/disguised-ebml.bin": (
+            bytes((0x1A, 0x45, 0xDF, 0xA3)) + b"synthetic"
+        ),
+        "tests/disguised-m2ts.bin": bytearray(389),
+    }
+    m2ts = disguised_media["tests/disguised-m2ts.bin"]
+    for position in (4, 196, 388):
+        m2ts[position] = 0x47
+    for relative_path, content in disguised_media.items():
+        (repo_copy / relative_path).write_bytes(content)
     subprocess.run(
-        ["git", "add", "tests/disguised-media.bin"],
+        ["git", "add", "--", *disguised_media],
         cwd=repo_copy,
         check=True,
     )
@@ -154,7 +163,13 @@ def test_repository_validator_rejects_disguised_media_signature(
     assert payload["status"] == "error"
     assert (
         "forbidden private/heavy media content in repository: "
-        "tests/disguised-media.bin detected Matroska/WebM"
+        "tests/disguised-ebml.bin detected Matroska/WebM"
+        in payload["errors"]
+    )
+    assert (
+        "forbidden private/heavy media content in repository: "
+        "tests/disguised-m2ts.bin detected MPEG transport stream "
+        "(192-byte packets)"
         in payload["errors"]
     )
 

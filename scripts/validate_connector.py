@@ -415,13 +415,15 @@ def _detected_media_signature(path: Path) -> str | None:
             return "AIFF"
     if len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0:
         return "MPEG/AAC audio"
-    if (
-        len(header) > 376
-        and header[0] == 0x47
-        and header[188] == 0x47
-        and header[376] == 0x47
-    ):
-        return "MPEG transport stream"
+    for packet_size in (188, 192, 204, 208):
+        for prefix_size in range(16):
+            sync_positions = tuple(
+                prefix_size + packet_size * index for index in range(3)
+            )
+            if len(header) <= sync_positions[-1]:
+                continue
+            if all(header[position] == 0x47 for position in sync_positions):
+                return f"MPEG transport stream ({packet_size}-byte packets)"
     return None
 
 
