@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest
+from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest, canonical_digest
 from aoa_gopro_connector.errors import ContractError
 from aoa_gopro_connector.schema import validate_document
 
 
 PROFILE_DIGEST = "sha256:" + "1" * 64
-STATE_DIGEST = "sha256:" + "2" * 64
 
 
 def _receipt(outcome: str = "succeeded") -> dict[str, object]:
@@ -30,12 +29,12 @@ def _receipt(outcome: str = "succeeded") -> dict[str, object]:
         "before": {
             "observed_at": "2026-08-30T05:00:00Z",
             "state": {"recording": False},
-            "state_digest": STATE_DIGEST,
+            "state_digest": canonical_digest({"recording": False}),
         },
         "after": {
             "observed_at": "2026-08-30T05:00:01Z",
             "state": {"recording": True},
-            "state_digest": STATE_DIGEST,
+            "state_digest": canonical_digest({"recording": True}),
         },
         "steps": [
             {
@@ -204,4 +203,15 @@ def test_receipt_validation_rejects_stale_digest() -> None:
     receipt = _receipt()
     receipt["actor_version"] = "fixture-actor-v2"
     with pytest.raises(ContractError, match="receipt_digest"):
+        validate_document("operation_receipt", receipt)
+
+
+@pytest.mark.parametrize("snapshot_field", ["before", "after"])
+def test_receipt_validation_rejects_stale_state_snapshot_digest(
+    snapshot_field: str,
+) -> None:
+    receipt = _receipt()
+    receipt[snapshot_field]["state"]["recording"] = "mutated"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match=f"{snapshot_field}.state_digest"):
         validate_document("operation_receipt", receipt)

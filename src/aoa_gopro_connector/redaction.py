@@ -122,6 +122,11 @@ IPV6_CANDIDATE_PATTERN = re.compile(
     r"(?:%[0-9a-z_.~%-]+)?\]?"
     r"(?![0-9a-f:])"
 )
+PUBLIC_HOSTNAME_PATTERN = re.compile(
+    r"(?i)(?<![A-Za-z0-9_-])"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z]{2,63}\.?(?![A-Za-z0-9_-])"
+)
 MAX_PUBLIC_ARTIFACT_DEPTH = 64
 MAX_PUBLIC_ARTIFACT_NODES = 50_000
 SYNTHETIC_MEDIA_FILENAMES = {
@@ -152,6 +157,14 @@ def _is_media_filename_path(segments: tuple[str | int, ...]) -> bool:
         and segments[-3] == "fs"
         and isinstance(segments[-2], int)
         and segments[-1] == "n"
+    )
+
+
+def _is_profile_limitation_path(segments: tuple[str | int, ...]) -> bool:
+    return (
+        len(segments) == 2
+        and segments[0] == "limitations"
+        and isinstance(segments[1], int)
     )
 
 
@@ -230,6 +243,10 @@ def public_safety_violations(
             continue
         if isinstance(item_value, str):
             violations.extend(_string_safety_violations(item_value, path=item_path))
+            if _is_profile_limitation_path(segments) and PUBLIC_HOSTNAME_PATTERN.search(
+                item_value
+            ):
+                violations.append(f"{item_path}: contains public hostname")
     return violations
 
 

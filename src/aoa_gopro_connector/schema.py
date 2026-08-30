@@ -11,7 +11,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
 
-from .digest import verify_digest
+from .digest import canonical_digest, verify_digest
 from .errors import ContractError
 from .json_io import strict_json_loads
 from .models import canonical_profile_id
@@ -120,6 +120,17 @@ def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
             )
 
 
+def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
+    for field in ("before", "after"):
+        snapshot = document[field]
+        expected = canonical_digest(snapshot["state"])
+        if snapshot["state_digest"] != expected:
+            raise ContractError(
+                f"operation_receipt validation failed at {field}.state_digest: "
+                f"expected {expected}"
+            )
+
+
 def _validate_event_freshness(document: dict[str, Any]) -> None:
     freshness = document["freshness"]
     observed_at = _rfc3339_datetime(
@@ -173,6 +184,7 @@ def validate_document(name: str, document: Any) -> None:
         assert_public_safe(document)
     elif normalized_name == "operation_receipt":
         _validate_operation_receipt_timeline(document)
+        _validate_operation_receipt_snapshots(document)
     elif normalized_name == "event":
         _validate_event_freshness(document)
     digest_field = PACKET_DIGEST_FIELDS.get(normalized_name)

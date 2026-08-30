@@ -60,6 +60,13 @@ def test_unrelated_short_n_key_is_not_globally_sensitive() -> None:
     assert_public_safe({"n": "synthetic-non-media-value"})
 
 
+def test_profile_limitation_rejects_public_hostname() -> None:
+    with pytest.raises(PublicSafetyError, match="public hostname"):
+        assert_public_safe(
+            {"limitations": ["Observed at owned-camera.example.com during probe."]}
+        )
+
+
 def test_public_safety_rejects_excessive_nesting_without_recursion() -> None:
     root: dict[str, object] = {}
     cursor = root
