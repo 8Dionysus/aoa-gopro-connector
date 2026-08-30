@@ -19,6 +19,9 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
         {"value": "http://[::1]"},
         {"value": "http://kitchen-camera.local:8080"},
         {"value": "aa:bb:cc:dd:ee:ff"},
+        {"value": "AA-BB-CC-DD-EE-FF"},
+        {"value": "aabb.ccdd.eeff"},
+        {"value": "AABBCCDDEEFF"},
         {"value": "C1234567890123"},
     ],
 )

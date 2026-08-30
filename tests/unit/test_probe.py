@@ -71,6 +71,35 @@ def test_probe_rejects_media_group_without_file_list() -> None:
         build_capability_profile(adapter, _context(adapter))
 
 
+def test_probe_rejects_media_group_without_directory() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"] = {
+        "id": "fixture",
+        "media": [{"fs": []}],
+    }
+    adapter = ReplayReadAdapter(value)
+    with pytest.raises(ContractError, match="no directory field"):
+        build_capability_profile(adapter, _context(adapter))
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [(None, "not an object"), ({}, "no name field")],
+)
+def test_probe_rejects_malformed_media_file_entry(
+    entry: object,
+    message: str,
+) -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"] = {
+        "id": "fixture",
+        "media": [{"d": "100GOPRO", "fs": [entry]}],
+    }
+    adapter = ReplayReadAdapter(value)
+    with pytest.raises(ContractError, match=message):
+        build_capability_profile(adapter, _context(adapter))
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("model_name", True), ("model_number", False)],

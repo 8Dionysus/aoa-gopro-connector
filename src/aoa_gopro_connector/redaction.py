@@ -32,7 +32,16 @@ SENSITIVE_KEYS = {
 }
 
 VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("mac address", re.compile(r"(?i)\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b")),
+    (
+        "mac address",
+        re.compile(
+            r"(?i)\b(?:"
+            r"(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}|"
+            r"(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}|"
+            r"[0-9a-f]{12}"
+            r")\b"
+        ),
+    ),
     (
         "IPv4 address",
         re.compile(
