@@ -39,10 +39,19 @@
         "firmware_posture"
       ],
       "properties": {
-        "model_name": {"type": "string", "minLength": 1},
-        "model_number": {"type": "string", "minLength": 1},
-        "firmware_vendor_version": {"type": "string", "minLength": 1},
-        "firmware_release_version": {"type": "string", "minLength": 1},
+        "model_name": {
+          "type": "string",
+          "pattern": "^(HERO([0-9]{1,2})?( Black( Mini)?)?|MAX( ?[0-9])?|LIT HERO)$"
+        },
+        "model_number": {"type": "string", "pattern": "^[0-9]{1,6}$"},
+        "firmware_vendor_version": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]{1,7}(\\.[0-9]{1,4}){3,6}$"
+        },
+        "firmware_release_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]{2,4}\\.[0-9]{2,4}$"
+        },
         "firmware_posture": {"enum": ["stock", "labs", "unknown"]}
       }
     },

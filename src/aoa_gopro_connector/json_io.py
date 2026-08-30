@@ -38,15 +38,21 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def strict_json_loads(value: str | bytes | bytearray) -> Any:
     """Decode RFC-compliant JSON without Python's NaN/Infinity extensions."""
 
-    return json.loads(
-        value,
-        parse_constant=_reject_nonstandard_constant,
-        parse_float=_parse_finite_float,
-        object_pairs_hook=_unique_object,
-    )
+    try:
+        return json.loads(
+            value,
+            parse_constant=_reject_nonstandard_constant,
+            parse_float=_parse_finite_float,
+            object_pairs_hook=_unique_object,
+        )
+    except RecursionError as exc:
+        raise json.JSONDecodeError("JSON nesting exceeds decoder limit", "", 0) from exc
 
 
 def strict_json_dumps(value: Any, **kwargs: Any) -> str:
     """Encode JSON while refusing non-finite numeric values."""
 
-    return json.dumps(value, allow_nan=False, **kwargs)
+    try:
+        return json.dumps(value, allow_nan=False, **kwargs)
+    except RecursionError as exc:
+        raise ValueError("JSON nesting exceeds encoder limit") from exc

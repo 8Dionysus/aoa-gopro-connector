@@ -25,6 +25,17 @@ def test_strict_json_loads_rejects_duplicate_object_keys() -> None:
         strict_json_loads('{"value": 1, "value": 2}')
 
 
+def test_strict_json_loads_translates_decoder_recursion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_recursively(*args: object, **kwargs: object) -> object:
+        raise RecursionError("synthetic decoder recursion")
+
+    monkeypatch.setattr(json, "loads", fail_recursively)
+    with pytest.raises(json.JSONDecodeError, match="nesting exceeds decoder limit"):
+        strict_json_loads("{}")
+
+
 @pytest.mark.parametrize(
     "value",
     [float("nan"), float("inf"), float("-inf")],

@@ -30,6 +30,13 @@ DISCOVERY_MECHANISMS = (
     "wifi_scan",
 )
 PROTOCOL_VERSION_PATTERN = re.compile(r"^(?:unknown|[0-9]+(?:\.[0-9]+)*)$")
+MODEL_NAME_PATTERN = re.compile(
+    r"^(?:HERO(?:[0-9]{1,2})?(?: Black(?: Mini)?)?|MAX(?: ?[0-9])?|LIT HERO)$"
+)
+MODEL_NUMBER_PATTERN = re.compile(r"^[0-9]{1,6}$")
+FIRMWARE_VERSION_PATTERN = re.compile(
+    r"^[A-Z][A-Z0-9]{1,7}(?:\.[0-9]{1,4}){3,6}$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,16 +124,17 @@ def build_capability_profile(
     model_name = info.get("model_name")
     model_number = info.get("model_number")
     firmware_version = info.get("firmware_version")
-    if not isinstance(model_name, str) or not model_name.strip():
-        raise ContractError("camera info lacks safe model_name")
-    if (
-        isinstance(model_number, bool)
-        or not isinstance(model_number, (str, int))
-        or (isinstance(model_number, str) and not model_number.strip())
-    ):
+    if not isinstance(model_name, str) or not MODEL_NAME_PATTERN.fullmatch(model_name):
+        raise ContractError("camera info lacks documented model_name")
+    if isinstance(model_number, bool) or not isinstance(model_number, (str, int)):
         raise ContractError("camera info lacks safe model_number")
-    if not isinstance(firmware_version, str) or not firmware_version:
-        raise ContractError("camera info lacks firmware_version")
+    model_number_text = str(model_number)
+    if not MODEL_NUMBER_PATTERN.fullmatch(model_number_text):
+        raise ContractError("camera info lacks safe model_number")
+    if not isinstance(firmware_version, str) or not FIRMWARE_VERSION_PATTERN.fullmatch(
+        firmware_version
+    ):
+        raise ContractError("camera info lacks documented firmware_version")
     statuses = state.get("status")
     settings = state.get("settings")
     if not isinstance(statuses, dict) or not isinstance(settings, dict):
@@ -161,7 +169,7 @@ def build_capability_profile(
         "device_ref": "device:redacted",
         "camera": {
             "model_name": str(model_name),
-            "model_number": str(model_number),
+            "model_number": model_number_text,
             "firmware_vendor_version": firmware_version,
             "firmware_release_version": release_version,
             "firmware_posture": context.firmware_posture,

@@ -159,6 +159,27 @@ def test_probe_rejects_boolean_model_fields(field: str, value: bool) -> None:
         build_capability_profile(adapter, _context(adapter))
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("model_name", "kitchen-hero13", "model_name"),
+        ("model_number", "kitchen-65", "model_number"),
+        ("model_number", -1, "model_number"),
+        ("firmware_version", "kitchen-hero13", "firmware_version"),
+    ],
+)
+def test_probe_rejects_identifier_shaped_camera_metadata(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    fixture["responses"]["/gopro/camera/info"][field] = value
+    adapter = ReplayReadAdapter(fixture)
+    with pytest.raises(ContractError, match=message):
+        build_capability_profile(adapter, _context(adapter))
+
+
 def test_named_live_profile_is_valid_and_redacted() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))

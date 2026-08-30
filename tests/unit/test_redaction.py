@@ -21,6 +21,7 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
         {"value": "kitchen-camera.home.arpa"},
         {"value": "camera.lan"},
         {"value": "camera.localdomain"},
+        {"camera.home.arpa": "synthetic"},
         {"value": "aa:bb:cc:dd:ee:ff"},
         {"value": "AA-BB-CC-DD-EE-FF"},
         {"value": "aabb.ccdd.eeff"},
@@ -40,3 +41,15 @@ def test_public_safety_rejects_camera_media_filename_by_wire_path() -> None:
 
 def test_unrelated_short_n_key_is_not_globally_sensitive() -> None:
     assert_public_safe({"n": "synthetic-non-media-value"})
+
+
+def test_public_safety_rejects_excessive_nesting_without_recursion() -> None:
+    root: dict[str, object] = {}
+    cursor = root
+    for _ in range(80):
+        child: dict[str, object] = {}
+        cursor["child"] = child
+        cursor = child
+
+    with pytest.raises(PublicSafetyError, match="nesting limit"):
+        assert_public_safe(root)

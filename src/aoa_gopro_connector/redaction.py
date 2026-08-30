@@ -69,6 +69,8 @@ IPV6_CANDIDATE_PATTERN = re.compile(
     r"(?:%[0-9a-z_.~%-]+)?\]?"
     r"(?![0-9a-f:])"
 )
+MAX_PUBLIC_ARTIFACT_DEPTH = 64
+MAX_PUBLIC_ARTIFACT_NODES = 50_000
 
 
 def _contains_ipv6(value: str) -> bool:
@@ -93,6 +95,16 @@ def _is_media_filename_path(segments: tuple[str | int, ...]) -> bool:
     )
 
 
+def _string_safety_violations(value: str, *, path: str) -> list[str]:
+    violations: list[str] = []
+    for label, pattern in VALUE_PATTERNS:
+        if pattern.search(value):
+            violations.append(f"{path}: contains {label}")
+    if _contains_ipv6(value):
+        violations.append(f"{path}: contains IPv6 address")
+    return violations
+
+
 def public_safety_violations(
     value: Any,
     *,
@@ -100,40 +112,48 @@ def public_safety_violations(
     _segments: tuple[str | int, ...] = (),
 ) -> list[str]:
     violations: list[str] = []
-    if isinstance(value, Mapping):
-        for key, item in value.items():
-            key_text = str(key)
-            item_segments = (*_segments, key_text)
-            if key_text.casefold() in SENSITIVE_KEYS:
-                violations.append(f"{path}.{key_text}: forbidden identity/secret key")
-            if _is_media_filename_path(item_segments):
-                violations.append(f"{path}.{key_text}: forbidden camera media filename")
-            violations.extend(
-                public_safety_violations(
-                    item,
-                    path=f"{path}.{key_text}",
-                    _segments=item_segments,
+    stack: list[tuple[Any, str, tuple[str | int, ...], int]] = [
+        (value, path, _segments, 0)
+    ]
+    visited = 0
+    while stack:
+        item_value, item_path, segments, depth = stack.pop()
+        visited += 1
+        if visited > MAX_PUBLIC_ARTIFACT_NODES:
+            violations.append(f"{path}: exceeds public artifact node limit")
+            break
+        if depth > MAX_PUBLIC_ARTIFACT_DEPTH:
+            violations.append(f"{item_path}: exceeds public artifact nesting limit")
+            continue
+        if isinstance(item_value, Mapping):
+            for key, item in reversed(tuple(item_value.items())):
+                key_text = str(key)
+                child_path = f"{item_path}.{key_text}"
+                item_segments = (*segments, key_text)
+                if key_text.casefold() in SENSITIVE_KEYS:
+                    violations.append(f"{child_path}: forbidden identity/secret key")
+                violations.extend(
+                    _string_safety_violations(key_text, path=f"{child_path} key")
                 )
-            )
-        return violations
-    if isinstance(value, Sequence) and not isinstance(
-        value, (str, bytes, bytearray)
-    ):
-        for index, item in enumerate(value):
-            violations.extend(
-                public_safety_violations(
-                    item,
-                    path=f"{path}[{index}]",
-                    _segments=(*_segments, index),
+                if _is_media_filename_path(item_segments):
+                    violations.append(f"{child_path}: forbidden camera media filename")
+                stack.append((item, child_path, item_segments, depth + 1))
+            continue
+        if isinstance(item_value, Sequence) and not isinstance(
+            item_value, (str, bytes, bytearray)
+        ):
+            for index in range(len(item_value) - 1, -1, -1):
+                stack.append(
+                    (
+                        item_value[index],
+                        f"{item_path}[{index}]",
+                        (*segments, index),
+                        depth + 1,
+                    )
                 )
-            )
-        return violations
-    if isinstance(value, str):
-        for label, pattern in VALUE_PATTERNS:
-            if pattern.search(value):
-                violations.append(f"{path}: contains {label}")
-        if _contains_ipv6(value):
-            violations.append(f"{path}: contains IPv6 address")
+            continue
+        if isinstance(item_value, str):
+            violations.extend(_string_safety_violations(item_value, path=item_path))
     return violations
 
 
