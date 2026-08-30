@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import json
 import re
@@ -194,8 +195,8 @@ for media_suffix in sorted(FORBIDDEN_PRIVATE_MEDIA_SUFFIXES):
     if media_pattern not in REQUIRED_GITIGNORE:
         REQUIRED_GITIGNORE.append(media_pattern)
 
-# A future public binary fixture must be admitted by exact path and reviewed digest.
-PUBLIC_SYNTHETIC_MEDIA_DIGESTS: dict[str, str] = {}
+# A future public binary artifact must be admitted by exact path and reviewed digest.
+PUBLIC_BINARY_ARTIFACT_DIGESTS: dict[str, str] = {}
 
 FORBIDDEN_CREDENTIAL_SUFFIXES = {
     ".cer",
@@ -427,12 +428,12 @@ def _detected_media_signature(path: Path) -> str | None:
     return None
 
 
-def _verify_public_synthetic_media(
+def _verify_public_binary_artifact(
     relative: Path,
     candidate: Path,
     errors: list[str],
 ) -> bool:
-    expected = PUBLIC_SYNTHETIC_MEDIA_DIGESTS.get(relative.as_posix())
+    expected = PUBLIC_BINARY_ARTIFACT_DIGESTS.get(relative.as_posix())
     if expected is None:
         return False
     digest = hashlib.sha256()
@@ -442,26 +443,45 @@ def _verify_public_synthetic_media(
                 digest.update(chunk)
     except OSError as exc:
         errors.append(
-            f"cannot inspect allowlisted synthetic media {relative.as_posix()}: {exc}"
+            f"cannot inspect allowlisted binary artifact {relative.as_posix()}: {exc}"
         )
         return True
     actual = "sha256:" + digest.hexdigest()
     if actual != expected:
         errors.append(
-            "allowlisted synthetic media digest mismatch: "
+            "allowlisted binary artifact digest mismatch: "
             f"{relative.as_posix()} expected {expected}, got {actual}"
         )
+    return True
+
+
+def _is_bounded_utf8_text(path: Path) -> bool:
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="strict")
+    with path.open("rb") as stream:
+        while chunk := stream.read(64 * 1024):
+            if b"\x00" in chunk:
+                return False
+            try:
+                text = decoder.decode(chunk)
+            except UnicodeDecodeError:
+                return False
+            if any(ord(character) < 0x20 and character not in "\t\n\r\f" for character in text):
+                return False
+        try:
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            return False
     return True
 
 
 def _check_private_repository_files(errors: list[str]) -> int:
     paths = _repository_publication_paths(errors)
     published = {relative.as_posix() for relative in paths}
-    for relative in sorted(set(PUBLIC_SYNTHETIC_MEDIA_DIGESTS) - published):
-        errors.append(f"allowlisted synthetic media is not published: {relative}")
+    for relative in sorted(set(PUBLIC_BINARY_ARTIFACT_DIGESTS) - published):
+        errors.append(f"allowlisted binary artifact is not published: {relative}")
     for relative in paths:
         candidate = REPO_ROOT / relative
-        if _verify_public_synthetic_media(relative, candidate, errors):
+        if _verify_public_binary_artifact(relative, candidate, errors):
             continue
         if relative.suffix.casefold() in FORBIDDEN_PRIVATE_MEDIA_SUFFIXES:
             errors.append(
@@ -485,6 +505,7 @@ def _check_private_repository_files(errors: list[str]) -> int:
         try:
             contains_marker = _contains_forbidden_pem_marker(candidate)
             media_signature = _detected_media_signature(candidate)
+            is_text = _is_bounded_utf8_text(candidate)
         except OSError as exc:
             errors.append(
                 f"cannot inspect publication file {relative.as_posix()}: {exc}"
@@ -499,6 +520,11 @@ def _check_private_repository_files(errors: list[str]) -> int:
             errors.append(
                 "forbidden private/heavy media content in repository: "
                 f"{relative.as_posix()} detected {media_signature}"
+            )
+        elif not is_text:
+            errors.append(
+                "non-allowlisted binary artifact in repository: "
+                f"{relative.as_posix()}"
             )
     return len(paths)
 

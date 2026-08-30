@@ -115,6 +115,28 @@ def test_operation_plan_decimal_parameter_integrity_survives_wire_decode() -> No
         validate_document("operation_plan", attacked)
 
 
+def test_schema_integer_accepts_integral_decimal_wire_value() -> None:
+    event = _event()
+    event["monotonic_ns"] = 0
+    event = attach_digest(event, "event_digest")
+    encoded = strict_json_dumps(event, sort_keys=True, separators=(",", ":"))
+    decoded = strict_json_loads(
+        encoded.replace('"monotonic_ns":0', '"monotonic_ns":0.0')
+    )
+
+    assert decoded["monotonic_ns"] == Decimal("0.0")
+    validate_document("event", decoded)
+
+
+def test_schema_integer_rejects_fractional_decimal_wire_value() -> None:
+    event = _event()
+    event["monotonic_ns"] = Decimal("0.5")
+    event = attach_digest(event, "event_digest")
+
+    with pytest.raises(ContractError, match="monotonic_ns"):
+        validate_document("event", event)
+
+
 @pytest.mark.parametrize(
     "preconditions",
     [

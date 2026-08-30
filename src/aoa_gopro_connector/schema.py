@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, validators
 from jsonschema.exceptions import SchemaError
 
 from .digest import canonical_digest, verify_digest
@@ -42,6 +42,22 @@ RFC3339_PATTERN = re.compile(
     r"(?P<offset>[Zz]|[+-][0-9]{2}:[0-9]{2})$"
 )
 Rfc3339Instant = tuple[int, int, Decimal]
+
+
+def _is_json_schema_integer(_checker: object, instance: object) -> bool:
+    if isinstance(instance, Decimal):
+        return instance.is_finite() and instance == instance.to_integral_value()
+    return Draft202012Validator.TYPE_CHECKER.is_type(instance, "integer")
+
+
+CONNECTOR_TYPE_CHECKER = Draft202012Validator.TYPE_CHECKER.redefine(
+    "integer",
+    _is_json_schema_integer,
+)
+ConnectorValidator = validators.extend(
+    Draft202012Validator,
+    type_checker=CONNECTOR_TYPE_CHECKER,
+)
 
 
 def schema_root() -> Path:
@@ -346,7 +362,7 @@ def _validate_media_manifest_derivative_refs(document: dict[str, Any]) -> None:
 
 def validate_document(name: str, document: Any) -> None:
     normalized_name = name.removesuffix(".schema.json")
-    validator = Draft202012Validator(
+    validator = ConnectorValidator(
         load_schema(name),
         format_checker=RFC3339_FORMAT_CHECKER,
     )

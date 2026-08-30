@@ -174,6 +174,42 @@ def test_repository_validator_rejects_disguised_media_signatures(
     )
 
 
+def test_repository_validator_rejects_renamed_binary_credential(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    renamed_key = repo_copy / "tests/camera-private.bin"
+    renamed_key.write_bytes(
+        bytes((0x30, 0x82, 0x04, 0xA3, 0x02, 0x01, 0x00, 0x02, 0x82, 0x01))
+    )
+    subprocess.run(
+        ["git", "add", "tests/camera-private.bin"],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert (
+        "non-allowlisted binary artifact in repository: tests/camera-private.bin"
+        in payload["errors"]
+    )
+
+
 def test_repository_validator_rejects_force_tracked_credential_or_certificate(
     tmp_path: Path,
 ) -> None:
