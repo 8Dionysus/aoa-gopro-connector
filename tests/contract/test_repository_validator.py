@@ -6,8 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -82,18 +80,52 @@ def test_repository_validator_checks_every_discovered_public_artifact(
     )
 
 
-@pytest.mark.parametrize(
-    "relative_path",
-    [
+def test_repository_validator_rejects_force_tracked_private_media(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    relative_paths = [
         "tests/private.mp4",
         "tests/private.jpg",
         "tests/private.gpr",
         "tests/private.360",
-    ],
-)
-def test_repository_validator_rejects_force_tracked_private_media(
+        "tests/private.mkv",
+        "tests/private.avi",
+        "tests/private.webm",
+    ]
+    for relative_path in relative_paths:
+        (repo_copy / relative_path).write_bytes(b"not a public fixture")
+    subprocess.run(
+        ["git", "add", "-f", "--", *relative_paths],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    for relative_path in relative_paths:
+        assert (
+            "forbidden private/heavy media file in repository: " + relative_path
+            in payload["errors"]
+        )
+
+
+def test_repository_validator_rejects_disguised_media_signature(
     tmp_path: Path,
-    relative_path: str,
 ) -> None:
     repo_copy = tmp_path / "repo"
     shutil.copytree(
@@ -108,10 +140,10 @@ def test_repository_validator_rejects_force_tracked_private_media(
         ),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
-    private_media = repo_copy / relative_path
-    private_media.write_bytes(b"not a public fixture")
+    disguised_media = repo_copy / "tests/disguised-media.bin"
+    disguised_media.write_bytes(bytes((0x1A, 0x45, 0xDF, 0xA3)) + b"synthetic")
     subprocess.run(
-        ["git", "add", "-f", relative_path],
+        ["git", "add", "tests/disguised-media.bin"],
         cwd=repo_copy,
         check=True,
     )
@@ -121,18 +153,14 @@ def test_repository_validator_rejects_force_tracked_private_media(
     payload = json.loads(completed.stdout)
     assert payload["status"] == "error"
     assert (
-        "forbidden private/heavy media file in repository: " + relative_path
+        "forbidden private/heavy media content in repository: "
+        "tests/disguised-media.bin detected Matroska/WebM"
         in payload["errors"]
     )
 
 
-@pytest.mark.parametrize(
-    "relative_path",
-    ["tests/camera-private-key.pem", "tests/camera-private.p8"],
-)
 def test_repository_validator_rejects_force_tracked_credential_or_certificate(
     tmp_path: Path,
-    relative_path: str,
 ) -> None:
     repo_copy = tmp_path / "repo"
     shutil.copytree(
@@ -147,10 +175,11 @@ def test_repository_validator_rejects_force_tracked_credential_or_certificate(
         ),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
-    certificate = repo_copy / relative_path
-    certificate.write_bytes(b"synthetic binary private material")
+    relative_paths = ["tests/camera-private-key.pem", "tests/camera-private.p8"]
+    for relative_path in relative_paths:
+        (repo_copy / relative_path).write_bytes(b"synthetic binary private material")
     subprocess.run(
-        ["git", "add", "-f", relative_path],
+        ["git", "add", "-f", "--", *relative_paths],
         cwd=repo_copy,
         check=True,
     )
@@ -159,11 +188,12 @@ def test_repository_validator_rejects_force_tracked_credential_or_certificate(
     assert completed.returncode == 1, completed.stdout + completed.stderr
     payload = json.loads(completed.stdout)
     assert payload["status"] == "error"
-    assert (
-        "forbidden credential/certificate file in repository: "
-        + relative_path
-        in payload["errors"]
-    )
+    for relative_path in relative_paths:
+        assert (
+            "forbidden credential/certificate file in repository: "
+            + relative_path
+            in payload["errors"]
+        )
 
 
 def test_repository_validator_rejects_secret_marker_without_secret_suffix(

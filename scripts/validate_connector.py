@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -140,17 +141,61 @@ FORBIDDEN_HEAVY_ROOTS = {
 }
 
 FORBIDDEN_PRIVATE_MEDIA_SUFFIXES = {
+    ".3g2",
+    ".3gp",
     ".360",
+    ".aac",
+    ".aif",
+    ".aiff",
+    ".amr",
+    ".avi",
+    ".avif",
+    ".bmp",
+    ".dng",
+    ".flac",
+    ".flv",
+    ".gif",
     ".gpmf",
     ".gpr",
+    ".heic",
+    ".heif",
     ".jpeg",
     ".jpg",
     ".lrv",
+    ".m2ts",
+    ".m4a",
+    ".m4v",
+    ".mkv",
     ".mov",
+    ".mp3",
     ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".mxf",
+    ".ogg",
+    ".ogv",
+    ".opus",
+    ".png",
+    ".raw",
     ".thm",
+    ".tif",
+    ".tiff",
+    ".vob",
     ".wav",
+    ".webm",
+    ".webp",
+    ".wma",
+    ".wmv",
 }
+
+for media_suffix in sorted(FORBIDDEN_PRIVATE_MEDIA_SUFFIXES):
+    media_pattern = f"*{media_suffix}"
+    if media_pattern not in REQUIRED_GITIGNORE:
+        REQUIRED_GITIGNORE.append(media_pattern)
+
+# A future public binary fixture must be admitted by exact path and reviewed digest.
+PUBLIC_SYNTHETIC_MEDIA_DIGESTS: dict[str, str] = {}
 
 FORBIDDEN_CREDENTIAL_SUFFIXES = {
     ".cer",
@@ -334,9 +379,88 @@ def _contains_forbidden_pem_marker(path: Path) -> bool:
     return False
 
 
+def _detected_media_signature(path: Path) -> str | None:
+    with path.open("rb") as stream:
+        header = stream.read(4096)
+    signatures = (
+        (b"\xff\xd8\xff", "JPEG"),
+        (b"\x89PNG\r\n\x1a\n", "PNG"),
+        (b"GIF87a", "GIF"),
+        (b"GIF89a", "GIF"),
+        (b"II*\x00", "TIFF/DNG"),
+        (b"MM\x00*", "TIFF/DNG"),
+        (b"\x1a\x45\xdf\xa3", "Matroska/WebM"),
+        (b"OggS", "Ogg"),
+        (b"fLaC", "FLAC"),
+        (b"ID3", "MP3"),
+        (b"FLV", "Flash Video"),
+        (b"MThd", "MIDI"),
+        (b"#!AMR", "AMR"),
+        (b"\x00\x00\x01\xba", "MPEG program stream"),
+        (b"\x00\x00\x01\xb3", "MPEG video"),
+    )
+    for signature, label in signatures:
+        if header.startswith(signature):
+            return label
+    if header.startswith(b"BM"):
+        return "BMP"
+    if len(header) >= 12 and header[4:8] == b"ftyp":
+        return "ISO base media"
+    if len(header) >= 12 and header.startswith(b"RIFF"):
+        riff_kind = header[8:12]
+        if riff_kind in {b"AVI ", b"WAVE", b"WEBP"}:
+            return f"RIFF {riff_kind.decode('ascii').strip()}"
+    if len(header) >= 12 and header.startswith(b"FORM"):
+        if header[8:12] in {b"AIFF", b"AIFC"}:
+            return "AIFF"
+    if len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0:
+        return "MPEG/AAC audio"
+    if (
+        len(header) > 376
+        and header[0] == 0x47
+        and header[188] == 0x47
+        and header[376] == 0x47
+    ):
+        return "MPEG transport stream"
+    return None
+
+
+def _verify_public_synthetic_media(
+    relative: Path,
+    candidate: Path,
+    errors: list[str],
+) -> bool:
+    expected = PUBLIC_SYNTHETIC_MEDIA_DIGESTS.get(relative.as_posix())
+    if expected is None:
+        return False
+    digest = hashlib.sha256()
+    try:
+        with candidate.open("rb") as stream:
+            while chunk := stream.read(64 * 1024):
+                digest.update(chunk)
+    except OSError as exc:
+        errors.append(
+            f"cannot inspect allowlisted synthetic media {relative.as_posix()}: {exc}"
+        )
+        return True
+    actual = "sha256:" + digest.hexdigest()
+    if actual != expected:
+        errors.append(
+            "allowlisted synthetic media digest mismatch: "
+            f"{relative.as_posix()} expected {expected}, got {actual}"
+        )
+    return True
+
+
 def _check_private_repository_files(errors: list[str]) -> int:
     paths = _repository_publication_paths(errors)
+    published = {relative.as_posix() for relative in paths}
+    for relative in sorted(set(PUBLIC_SYNTHETIC_MEDIA_DIGESTS) - published):
+        errors.append(f"allowlisted synthetic media is not published: {relative}")
     for relative in paths:
+        candidate = REPO_ROOT / relative
+        if _verify_public_synthetic_media(relative, candidate, errors):
+            continue
         if relative.suffix.casefold() in FORBIDDEN_PRIVATE_MEDIA_SUFFIXES:
             errors.append(
                 "forbidden private/heavy media file in repository: "
@@ -354,11 +478,11 @@ def _check_private_repository_files(errors: list[str]) -> int:
                 f"{relative.as_posix()}"
             )
             continue
-        candidate = REPO_ROOT / relative
         if candidate.is_symlink() or not candidate.is_file():
             continue
         try:
             contains_marker = _contains_forbidden_pem_marker(candidate)
+            media_signature = _detected_media_signature(candidate)
         except OSError as exc:
             errors.append(
                 f"cannot inspect publication file {relative.as_posix()}: {exc}"
@@ -368,6 +492,11 @@ def _check_private_repository_files(errors: list[str]) -> int:
             errors.append(
                 "forbidden credential/certificate material in repository: "
                 f"{relative.as_posix()}"
+            )
+        if media_signature is not None:
+            errors.append(
+                "forbidden private/heavy media content in repository: "
+                f"{relative.as_posix()} detected {media_signature}"
             )
     return len(paths)
 
