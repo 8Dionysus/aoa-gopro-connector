@@ -92,8 +92,14 @@ def build_capability_profile(
     model_name = info.get("model_name")
     model_number = info.get("model_number")
     firmware_version = info.get("firmware_version")
-    if not all(isinstance(value, (str, int)) for value in (model_name, model_number)):
-        raise ContractError("camera info lacks safe model fields")
+    if not isinstance(model_name, str) or not model_name.strip():
+        raise ContractError("camera info lacks safe model_name")
+    if (
+        isinstance(model_number, bool)
+        or not isinstance(model_number, (str, int))
+        or (isinstance(model_number, str) and not model_number.strip())
+    ):
+        raise ContractError("camera info lacks safe model_number")
     if not isinstance(firmware_version, str) or not firmware_version:
         raise ContractError("camera info lacks firmware_version")
     statuses = state.get("status")

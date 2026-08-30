@@ -64,22 +64,51 @@ def _contains_ipv6(value: str) -> bool:
     return False
 
 
-def public_safety_violations(value: Any, *, path: str = "$") -> list[str]:
+def _is_media_filename_path(segments: tuple[str | int, ...]) -> bool:
+    return (
+        len(segments) >= 5
+        and segments[-5] == "media"
+        and isinstance(segments[-4], int)
+        and segments[-3] == "fs"
+        and isinstance(segments[-2], int)
+        and segments[-1] == "n"
+    )
+
+
+def public_safety_violations(
+    value: Any,
+    *,
+    path: str = "$",
+    _segments: tuple[str | int, ...] = (),
+) -> list[str]:
     violations: list[str] = []
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
+            item_segments = (*_segments, key_text)
             if key_text.casefold() in SENSITIVE_KEYS:
                 violations.append(f"{path}.{key_text}: forbidden identity/secret key")
+            if _is_media_filename_path(item_segments):
+                violations.append(f"{path}.{key_text}: forbidden camera media filename")
             violations.extend(
-                public_safety_violations(item, path=f"{path}.{key_text}")
+                public_safety_violations(
+                    item,
+                    path=f"{path}.{key_text}",
+                    _segments=item_segments,
+                )
             )
         return violations
     if isinstance(value, Sequence) and not isinstance(
         value, (str, bytes, bytearray)
     ):
         for index, item in enumerate(value):
-            violations.extend(public_safety_violations(item, path=f"{path}[{index}]"))
+            violations.extend(
+                public_safety_violations(
+                    item,
+                    path=f"{path}[{index}]",
+                    _segments=(*_segments, index),
+                )
+            )
         return violations
     if isinstance(value, str):
         for label, pattern in VALUE_PATTERNS:

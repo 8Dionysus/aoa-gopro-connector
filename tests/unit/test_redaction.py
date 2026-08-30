@@ -24,3 +24,12 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
 def test_public_safety_rejects_identity(value: object) -> None:
     with pytest.raises(PublicSafetyError):
         assert_public_safe(value)
+
+
+def test_public_safety_rejects_camera_media_filename_by_wire_path() -> None:
+    with pytest.raises(PublicSafetyError, match="camera media filename"):
+        assert_public_safe({"media": [{"fs": [{"n": "GOPR0123.MP4"}]}]})
+
+
+def test_unrelated_short_n_key_is_not_globally_sensitive() -> None:
+    assert_public_safe({"n": "synthetic-non-media-value"})

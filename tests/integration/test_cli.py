@@ -23,3 +23,12 @@ def test_replay_cli_emits_profile(capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema_version"] == "aoa_gopro_capability_profile_v1"
     assert payload["posture"] == "sanitized_replay"
+
+
+def test_probe_cli_invalid_port_emits_structured_error(capsys) -> None:
+    assert main(["probe", "--base-url", "http://127.0.0.1:abc"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ContractError"

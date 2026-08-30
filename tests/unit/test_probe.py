@@ -71,6 +71,18 @@ def test_probe_rejects_media_group_without_file_list() -> None:
         build_capability_profile(adapter, _context(adapter))
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("model_name", True), ("model_number", False)],
+)
+def test_probe_rejects_boolean_model_fields(field: str, value: bool) -> None:
+    fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    fixture["responses"]["/gopro/camera/info"][field] = value
+    adapter = ReplayReadAdapter(fixture)
+    with pytest.raises(ContractError, match=field):
+        build_capability_profile(adapter, _context(adapter))
+
+
 def test_named_live_profile_is_valid_and_redacted() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))

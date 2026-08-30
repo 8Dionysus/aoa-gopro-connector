@@ -96,6 +96,15 @@ def test_public_address_is_rejected() -> None:
 
 
 @pytest.mark.parametrize(
+    "base_url",
+    ["http://127.0.0.1:abc", "http://127.0.0.1:70000"],
+)
+def test_invalid_port_is_a_contract_error(base_url: str) -> None:
+    with pytest.raises(ContractError, match="invalid port"):
+        HTTPReadAdapter(base_url)
+
+
+@pytest.mark.parametrize(
     ("base_url", "expected"),
     [
         ("http://[::1]", "http://[::1]"),
