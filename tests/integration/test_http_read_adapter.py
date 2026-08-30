@@ -195,14 +195,25 @@ def test_non_finite_timeout_is_a_contract_error(timeout_seconds: float) -> None:
 
 
 @pytest.mark.parametrize(
-    ("base_url", "expected"),
+    ("base_url", "expected_endpoint", "expected_host_header"),
     [
-        ("http://[::1]", "http://[::1]"),
-        ("http://[fe80::1]:8080", "http://[fe80::1]:8080"),
+        ("http://[::1]", "http://[::1]", "[::1]"),
+        ("http://[fe80::1]:8080", "http://[fe80::1]:8080", "[fe80::1]:8080"),
+        (
+            "http://[fe80::1%25eth0]:8080",
+            "http://[fe80::1%25eth0]:8080",
+            "[fe80::1%25eth0]:8080",
+        ),
     ],
 )
-def test_ipv6_base_url_preserves_brackets(base_url: str, expected: str) -> None:
-    assert _validate_base_url(base_url).endpoint == expected
+def test_ipv6_base_url_is_normalized_once(
+    base_url: str,
+    expected_endpoint: str,
+    expected_host_header: str,
+) -> None:
+    validated = _validate_base_url(base_url)
+    assert validated.endpoint == expected_endpoint
+    assert validated.host_header == expected_host_header
 
 
 def test_http_adapter_disables_ambient_proxies(monkeypatch: pytest.MonkeyPatch) -> None:

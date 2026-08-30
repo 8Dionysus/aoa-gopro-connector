@@ -133,13 +133,27 @@
       },
       "then": {
         "properties": {
+          "error": {"const": null},
           "postcondition_verdicts": {
             "minItems": 1,
             "items": {
-              "properties": {"verdict": {"const": "satisfied"}},
-              "required": ["verdict"]
+              "properties": {
+                "verdict": {"const": "satisfied"},
+                "observation_ref": {"type": "string", "minLength": 1}
+              },
+              "required": ["verdict", "observation_ref"]
+            }
+          },
+          "recovery": {
+            "properties": {
+              "result": {"enum": ["not_needed", "recovered"]}
             }
           }
+        }
+      },
+      "else": {
+        "properties": {
+          "error": {"type": "object"}
         }
       }
     }

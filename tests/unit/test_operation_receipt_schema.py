@@ -57,7 +57,15 @@ def _receipt(outcome: str = "succeeded") -> dict[str, object]:
             "attempt_count": 0,
             "result": "not_needed",
         },
-        "error": None,
+        "error": (
+            None
+            if outcome == "succeeded"
+            else {
+                "code": "fixture_failure",
+                "message": "synthetic failure",
+                "retryable": False,
+            }
+        ),
         "artifact_refs": [],
         "receipt_digest": ZERO_DIGEST,
     }
@@ -71,6 +79,13 @@ def test_successful_receipt_has_observed_satisfied_postcondition() -> None:
     "verdicts",
     [
         [],
+        [
+            {
+                "kind": "recording",
+                "verdict": "satisfied",
+                "observation_ref": None,
+            }
+        ],
         [
             {
                 "kind": "recording",
@@ -100,6 +115,33 @@ def test_failed_receipt_may_preserve_unknown_postcondition() -> None:
     receipt = _receipt("failed")
     receipt["postcondition_verdicts"] = []
     validate_document("operation_receipt", receipt)
+
+
+def test_successful_receipt_rejects_error_or_failed_recovery() -> None:
+    receipt = _receipt()
+    receipt["error"] = {
+        "code": "contradiction",
+        "message": "success cannot carry an error",
+        "retryable": False,
+    }
+    with pytest.raises(ContractError, match="error"):
+        validate_document("operation_receipt", receipt)
+
+    receipt = _receipt()
+    receipt["recovery"] = {
+        "attempted": True,
+        "attempt_count": 1,
+        "result": "failed",
+    }
+    with pytest.raises(ContractError, match="recovery.result"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_non_success_receipt_requires_typed_error() -> None:
+    receipt = _receipt("indeterminate")
+    receipt["error"] = None
+    with pytest.raises(ContractError, match="error"):
+        validate_document("operation_receipt", receipt)
 
 
 @pytest.mark.parametrize(

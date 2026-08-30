@@ -88,8 +88,14 @@ def _url_hostname(hostname: str) -> str:
     return f"[{hostname.replace('%', '%25')}]"
 
 
+def _decode_url_hostname(hostname: str) -> str:
+    if ":" in hostname and "%25" in hostname:
+        return hostname.replace("%25", "%", 1)
+    return hostname
+
+
 def _host_header(hostname: str, port: int | None) -> str:
-    authority = f"[{hostname}]" if ":" in hostname else hostname
+    authority = _url_hostname(hostname)
     return f"{authority}:{port}" if port is not None else authority
 
 
@@ -103,7 +109,7 @@ def _validate_base_url(base_url: str) -> _ValidatedBaseURL:
         raise ContractError("camera base URL cannot contain a path")
     if not parsed.hostname:
         raise ContractError("camera base URL has no hostname")
-    hostname = parsed.hostname
+    hostname = _decode_url_hostname(parsed.hostname)
     try:
         port_number = parsed.port
     except ValueError as exc:
