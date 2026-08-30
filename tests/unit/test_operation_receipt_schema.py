@@ -10,7 +10,24 @@ from aoa_gopro_connector.schema import validate_document
 PROFILE_DIGEST = "sha256:" + "1" * 64
 
 
+def _camera_state(*, recording: bool) -> dict[str, object]:
+    return {
+        "schema_version": "aoa_gopro_camera_state_v1",
+        "presence": "discovered",
+        "power": "on",
+        "control": "ready",
+        "network": "ready",
+        "previewing": False,
+        "recording": recording,
+        "media": "idle",
+        "health": "healthy",
+        "degraded_reasons": [],
+    }
+
+
 def _receipt(outcome: str = "succeeded") -> dict[str, object]:
+    before_state = _camera_state(recording=False)
+    after_state = _camera_state(recording=True)
     payload = {
         "schema_version": "aoa_gopro_operation_receipt_v1",
         "receipt_id": "receipt:fixture-record",
@@ -28,13 +45,13 @@ def _receipt(outcome: str = "succeeded") -> dict[str, object]:
         },
         "before": {
             "observed_at": "2026-08-30T05:00:00Z",
-            "state": {"recording": False},
-            "state_digest": canonical_digest({"recording": False}),
+            "state": before_state,
+            "state_digest": canonical_digest(before_state),
         },
         "after": {
             "observed_at": "2026-08-30T05:00:01Z",
-            "state": {"recording": True},
-            "state_digest": canonical_digest({"recording": True}),
+            "state": after_state,
+            "state_digest": canonical_digest(after_state),
         },
         "steps": [
             {
@@ -302,6 +319,20 @@ def test_receipt_validation_rejects_stale_state_snapshot_digest(
     receipt[snapshot_field]["state"]["recording"] = "mutated"
     receipt = attach_digest(receipt, "receipt_digest")
     with pytest.raises(ContractError, match=f"{snapshot_field}.state_digest"):
+        validate_document("operation_receipt", receipt)
+
+
+@pytest.mark.parametrize("snapshot_field", ["before", "after"])
+def test_receipt_rejects_invalid_embedded_camera_state(
+    snapshot_field: str,
+) -> None:
+    receipt = _receipt()
+    state = receipt[snapshot_field]["state"]
+    state["presence"] = "absent"
+    state["recording"] = True
+    receipt[snapshot_field]["state_digest"] = canonical_digest(state)
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match=f"{snapshot_field}.state"):
         validate_document("operation_receipt", receipt)
 
 

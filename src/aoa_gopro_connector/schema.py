@@ -212,6 +212,12 @@ def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
                 f"operation_receipt validation failed at {field}.state_digest: "
                 f"expected {expected}"
             )
+        try:
+            validate_document("camera_state", snapshot["state"])
+        except ContractError as exc:
+            raise ContractError(
+                f"operation_receipt validation failed at {field}.state: {exc}"
+            ) from exc
     if observed["before"] > observed["after"]:
         raise ContractError(
             "operation_receipt validation failed at after.observed_at: "
