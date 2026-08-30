@@ -51,7 +51,10 @@ class HTTPReadAdapter:
             raise ContractError("timeout must be within (0, 30] seconds")
         self._base_url = _validate_base_url(base_url)
         self._timeout_seconds = timeout_seconds
-        self._opener = urllib.request.build_opener(_NoRedirect())
+        self._opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            _NoRedirect(),
+        )
 
     def get_json(self, path: str) -> dict[str, Any]:
         if path not in ALLOWED_READ_PATHS:

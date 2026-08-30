@@ -15,6 +15,8 @@ def test_firmware_version_is_not_misclassified_as_ip() -> None:
     [
         {"serial_number": "redacted"},
         {"value": "192.168.1.50"},
+        {"value": "fe80::1234"},
+        {"value": "http://[::1]"},
         {"value": "aa:bb:cc:dd:ee:ff"},
         {"value": "C1234567890123"},
     ],

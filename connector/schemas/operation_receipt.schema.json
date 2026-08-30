@@ -99,6 +99,25 @@
     },
     "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"outcome": {"const": "succeeded"}},
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "postcondition_verdicts": {
+            "minItems": 1,
+            "items": {
+              "properties": {"verdict": {"const": "satisfied"}},
+              "required": ["verdict"]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "stateSnapshot": {
       "type": "object",

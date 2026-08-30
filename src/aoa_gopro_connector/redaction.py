@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -44,6 +45,24 @@ VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("GoPro-style stable hostname", re.compile(r"\bC\d{10,}\b")),
 )
 
+IPV6_CANDIDATE_PATTERN = re.compile(
+    r"(?i)(?<![0-9a-f:])"
+    r"\[?(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}"
+    r"(?:%[0-9a-z_.~%-]+)?\]?"
+    r"(?![0-9a-f:])"
+)
+
+
+def _contains_ipv6(value: str) -> bool:
+    for match in IPV6_CANDIDATE_PATTERN.finditer(value):
+        candidate = match.group(0).strip("[]").split("%", maxsplit=1)[0]
+        try:
+            ipaddress.IPv6Address(candidate)
+        except ipaddress.AddressValueError:
+            continue
+        return True
+    return False
+
 
 def public_safety_violations(value: Any, *, path: str = "$") -> list[str]:
     violations: list[str] = []
@@ -66,6 +85,8 @@ def public_safety_violations(value: Any, *, path: str = "$") -> list[str]:
         for label, pattern in VALUE_PATTERNS:
             if pattern.search(value):
                 violations.append(f"{path}: contains {label}")
+        if _contains_ipv6(value):
+            violations.append(f"{path}: contains IPv6 address")
     return violations
 
 

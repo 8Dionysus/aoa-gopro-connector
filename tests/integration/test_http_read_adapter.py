@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -103,6 +104,17 @@ def test_public_address_is_rejected() -> None:
 )
 def test_ipv6_base_url_preserves_brackets(base_url: str, expected: str) -> None:
     assert _validate_base_url(base_url) == expected
+
+
+def test_http_adapter_disables_ambient_proxies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.invalid:8080")
+    adapter = HTTPReadAdapter("http://127.0.0.1")
+    proxy_handlers = [
+        handler
+        for handler in adapter._opener.handlers
+        if isinstance(handler, urllib.request.ProxyHandler)
+    ]
+    assert not any(handler.proxies for handler in proxy_handlers)
 
 
 def test_redirect_handler_fails_closed(redirect_server: str) -> None:

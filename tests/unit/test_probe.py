@@ -60,6 +60,17 @@ def test_probe_rejects_media_response_without_inventory() -> None:
         build_capability_profile(adapter, _context(adapter))
 
 
+def test_probe_rejects_media_group_without_file_list() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"] = {
+        "id": "fixture",
+        "media": [{"d": "100GOPRO"}],
+    }
+    adapter = ReplayReadAdapter(value)
+    with pytest.raises(ContractError, match="no fs field"):
+        build_capability_profile(adapter, _context(adapter))
+
+
 def test_named_live_profile_is_valid_and_redacted() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))

@@ -60,7 +60,9 @@ def _count_media(payload: dict[str, Any]) -> tuple[int, int]:
     for group in groups:
         if not isinstance(group, dict):
             raise ContractError("media group is not an object")
-        items = group.get("fs", [])
+        if "fs" not in group:
+            raise ContractError("media group has no fs field")
+        items = group["fs"]
         if not isinstance(items, list):
             raise ContractError("media group fs is not a list")
         item_count += len(items)

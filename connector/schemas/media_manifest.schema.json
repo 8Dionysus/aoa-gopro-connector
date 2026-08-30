@@ -53,5 +53,22 @@
       "items": {"type": "string", "minLength": 1}
     },
     "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"ingest_state": {"const": "complete"}},
+        "required": ["ingest_state"]
+      },
+      "then": {
+        "properties": {
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "source_checksum": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  ]
 }
