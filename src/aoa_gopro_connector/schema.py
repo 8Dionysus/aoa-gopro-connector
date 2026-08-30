@@ -121,14 +121,25 @@ def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
 
 
 def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
+    observed: dict[str, datetime] = {}
     for field in ("before", "after"):
         snapshot = document[field]
+        observed[field] = _rfc3339_datetime(
+            snapshot["observed_at"],
+            schema_name="operation_receipt",
+            field=f"{field}.observed_at",
+        )
         expected = canonical_digest(snapshot["state"])
         if snapshot["state_digest"] != expected:
             raise ContractError(
                 f"operation_receipt validation failed at {field}.state_digest: "
                 f"expected {expected}"
             )
+    if observed["before"] > observed["after"]:
+        raise ContractError(
+            "operation_receipt validation failed at after.observed_at: "
+            "must not precede before.observed_at"
+        )
 
 
 def _validate_event_freshness(document: dict[str, Any]) -> None:

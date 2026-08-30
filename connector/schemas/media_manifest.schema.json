@@ -66,6 +66,9 @@
           "source_checksum": {
             "type": "string",
             "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "retention_class": {
+            "enum": ["ephemeral", "operator_retained", "policy_retained"]
           }
         }
       }

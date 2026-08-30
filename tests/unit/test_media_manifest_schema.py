@@ -36,6 +36,7 @@ def test_inventory_manifest_may_precede_transfer_integrity() -> None:
 
 def test_completed_ingest_requires_concrete_size_and_checksum() -> None:
     manifest = _manifest("complete")
+    manifest["retention_class"] = "ephemeral"
     with pytest.raises(ContractError, match="size_bytes"):
         validate_document("media_manifest", manifest)
 
@@ -44,6 +45,14 @@ def test_completed_ingest_requires_concrete_size_and_checksum() -> None:
         validate_document("media_manifest", manifest)
 
     manifest["source_checksum"] = SOURCE_DIGEST
-    manifest["retention_class"] = "ephemeral"
     manifest = attach_digest(manifest, "manifest_digest")
     validate_document("media_manifest", manifest)
+
+
+def test_completed_ingest_rejects_inventory_only_retention() -> None:
+    manifest = _manifest("complete")
+    manifest["size_bytes"] = 1024
+    manifest["source_checksum"] = SOURCE_DIGEST
+    manifest = attach_digest(manifest, "manifest_digest")
+    with pytest.raises(ContractError, match="retention_class"):
+        validate_document("media_manifest", manifest)

@@ -215,3 +215,12 @@ def test_receipt_validation_rejects_stale_state_snapshot_digest(
     receipt = attach_digest(receipt, "receipt_digest")
     with pytest.raises(ContractError, match=f"{snapshot_field}.state_digest"):
         validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_reversed_state_snapshot_chronology() -> None:
+    receipt = _receipt()
+    receipt["before"]["observed_at"] = "2026-08-30T05:00:01Z"
+    receipt["after"]["observed_at"] = "2026-08-30T05:00:00Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="after.observed_at"):
+        validate_document("operation_receipt", receipt)
