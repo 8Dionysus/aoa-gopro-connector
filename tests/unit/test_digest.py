@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aoa_gopro_connector.digest import attach_digest, verify_digest
+from aoa_gopro_connector.digest import attach_digest, canonical_digest, verify_digest
 from aoa_gopro_connector.errors import ContractError
 
 
@@ -18,3 +18,8 @@ def test_digest_detects_mutation() -> None:
     packet["value"] = 2
     with pytest.raises(ContractError, match="digest mismatch"):
         verify_digest(packet, "digest")
+
+
+def test_digest_translates_lone_surrogate_encoding_failure() -> None:
+    with pytest.raises(ContractError, match="canonically encoded"):
+        canonical_digest({"value": "\ud800"})

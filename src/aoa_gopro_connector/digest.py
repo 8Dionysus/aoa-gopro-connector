@@ -13,12 +13,15 @@ ZERO_DIGEST = "sha256:" + "0" * 64
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return strict_json_dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    try:
+        return strict_json_dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ContractError("value cannot be canonically encoded as UTF-8 JSON") from exc
 
 
 def canonical_digest(value: Any) -> str:

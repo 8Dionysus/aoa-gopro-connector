@@ -31,6 +31,19 @@ def test_strict_json_loads_rejects_duplicate_object_keys() -> None:
         strict_json_loads('{"value": 1, "value": 2}')
 
 
+@pytest.mark.parametrize(
+    "encoded",
+    [r'{"value": "\ud800"}', r'{"\udfff": "value"}'],
+)
+def test_strict_json_loads_rejects_lone_surrogate(encoded: str) -> None:
+    with pytest.raises(json.JSONDecodeError, match="lone surrogate"):
+        strict_json_loads(encoded)
+
+
+def test_strict_json_loads_accepts_valid_surrogate_pair() -> None:
+    assert strict_json_loads(r'{"value": "\ud83d\ude00"}') == {"value": "😀"}
+
+
 def test_strict_json_loads_translates_decoder_recursion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -49,3 +62,15 @@ def test_strict_json_loads_translates_decoder_recursion(
 def test_strict_json_dumps_rejects_non_finite_numbers(value: float) -> None:
     with pytest.raises(ValueError, match="Out of range float"):
         strict_json_dumps({"value": value})
+
+
+def test_strict_json_dumps_rejects_lone_surrogate() -> None:
+    with pytest.raises(ValueError, match="lone surrogate"):
+        strict_json_dumps({"value": "\ud800"})
+
+
+def test_strict_json_dumps_still_rejects_circular_reference() -> None:
+    value: list[object] = []
+    value.append(value)
+    with pytest.raises(ValueError, match="Circular reference"):
+        strict_json_dumps(value)

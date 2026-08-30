@@ -291,3 +291,20 @@ def test_schema_cli_rejects_free_form_profile_evidence_ref(
     payload = json.loads(captured.err)
     assert payload["status"] == "error"
     assert payload["error_type"] == "ContractError"
+
+
+def test_schema_cli_rejects_lone_surrogate_without_traceback(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    document = tmp_path / "lone-surrogate.json"
+    document.write_text(r'{"value": "\ud800"}', encoding="utf-8")
+
+    assert main(["schema", "validate", "camera_state", str(document)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "JSONDecodeError"
+    assert "lone surrogate" in payload["message"]
+    assert "Traceback" not in captured.err

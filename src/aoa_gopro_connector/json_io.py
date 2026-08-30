@@ -10,6 +10,34 @@ from typing import Any, NoReturn
 MAX_JSON_INTEGER_DIGITS = 256
 
 
+def _contains_surrogate(value: str) -> bool:
+    return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
+
+
+def _has_surrogate_string(value: Any) -> bool:
+    stack = [value]
+    visited_containers: set[int] = set()
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            if _contains_surrogate(item):
+                return True
+        elif isinstance(item, dict):
+            identity = id(item)
+            if identity in visited_containers:
+                continue
+            visited_containers.add(identity)
+            stack.extend(item.keys())
+            stack.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            identity = id(item)
+            if identity in visited_containers:
+                continue
+            visited_containers.add(identity)
+            stack.extend(item)
+    return False
+
+
 def _reject_nonstandard_constant(value: str) -> NoReturn:
     raise json.JSONDecodeError(
         f"non-standard JSON numeric constant {value!r}",
@@ -56,7 +84,7 @@ def strict_json_loads(value: str | bytes | bytearray) -> Any:
     """Decode RFC-compliant JSON without Python's NaN/Infinity extensions."""
 
     try:
-        return json.loads(
+        decoded = json.loads(
             value,
             parse_constant=_reject_nonstandard_constant,
             parse_float=_parse_finite_float,
@@ -65,11 +93,20 @@ def strict_json_loads(value: str | bytes | bytearray) -> Any:
         )
     except RecursionError as exc:
         raise json.JSONDecodeError("JSON nesting exceeds decoder limit", "", 0) from exc
+    if _has_surrogate_string(decoded):
+        raise json.JSONDecodeError(
+            "JSON string contains a lone surrogate code point",
+            "",
+            0,
+        )
+    return decoded
 
 
 def strict_json_dumps(value: Any, **kwargs: Any) -> str:
     """Encode JSON while refusing non-finite numeric values."""
 
+    if _has_surrogate_string(value):
+        raise ValueError("JSON string contains a lone surrogate code point")
     try:
         return json.dumps(value, allow_nan=False, **kwargs)
     except RecursionError as exc:
