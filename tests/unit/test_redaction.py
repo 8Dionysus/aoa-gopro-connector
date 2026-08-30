@@ -60,11 +60,22 @@ def test_unrelated_short_n_key_is_not_globally_sensitive() -> None:
     assert_public_safe({"n": "synthetic-non-media-value"})
 
 
-def test_profile_limitation_rejects_public_hostname() -> None:
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        "owned-camera.example.com",
+        "owned-camera.xn--p1ai",
+        "камера.рф",
+        "камера。рф",
+    ],
+)
+def test_profile_limitation_rejects_public_hostname(hostname: str) -> None:
     with pytest.raises(PublicSafetyError, match="public hostname"):
-        assert_public_safe(
-            {"limitations": ["Observed at owned-camera.example.com during probe."]}
-        )
+        assert_public_safe({"limitations": [f"Observed at {hostname} during probe."]})
+
+
+def test_profile_limitation_allows_dotted_numeric_version() -> None:
+    assert_public_safe({"limitations": ["Stock firmware 2.10.00 was observed."]})
 
 
 def test_public_safety_rejects_excessive_nesting_without_recursion() -> None:

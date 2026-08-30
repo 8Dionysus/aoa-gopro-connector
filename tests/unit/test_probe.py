@@ -406,10 +406,16 @@ def test_capability_profile_validation_rejects_stale_digest() -> None:
         validate_document("capability_profile", profile)
 
 
-def test_capability_profile_rejects_public_hostname_in_limitation() -> None:
+@pytest.mark.parametrize(
+    "hostname",
+    ["owned-camera.example.com", "owned-camera.xn--p1ai", "камера.рф"],
+)
+def test_capability_profile_rejects_public_hostname_in_limitation(
+    hostname: str,
+) -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))
-    profile["limitations"].append("Observed at owned-camera.example.com.")
+    profile["limitations"].append(f"Observed at {hostname}.")
     profile = attach_digest(profile, "profile_digest")
     with pytest.raises(PublicSafetyError, match="public hostname"):
         validate_document("capability_profile", profile)

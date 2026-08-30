@@ -122,10 +122,15 @@ IPV6_CANDIDATE_PATTERN = re.compile(
     r"(?:%[0-9a-z_.~%-]+)?\]?"
     r"(?![0-9a-f:])"
 )
-PUBLIC_HOSTNAME_PATTERN = re.compile(
-    r"(?i)(?<![A-Za-z0-9_-])"
-    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
-    r"[A-Za-z]{2,63}\.?(?![A-Za-z0-9_-])"
+PUBLIC_HOSTNAME_CANDIDATE_PATTERN = re.compile(
+    r"(?<![\w-])(?:[^\W_]|-)+"
+    r"(?:[.\u3002\uff0e\uff61](?:[^\W_]|-)+)+(?![\w-])"
+)
+PUBLIC_ASCII_TLD_PATTERN = re.compile(
+    r"(?i)^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$"
+)
+IDNA_DOT_TRANSLATION = str.maketrans(
+    {"\u3002": ".", "\uff0e": ".", "\uff61": "."}
 )
 MAX_PUBLIC_ARTIFACT_DEPTH = 64
 MAX_PUBLIC_ARTIFACT_NODES = 50_000
@@ -146,6 +151,25 @@ def _contains_ipv6(value: str) -> bool:
         except ipaddress.AddressValueError:
             continue
         return True
+    return False
+
+
+def _contains_public_hostname(value: str) -> bool:
+    for match in PUBLIC_HOSTNAME_CANDIDATE_PATTERN.finditer(value):
+        candidate = match.group(0).translate(IDNA_DOT_TRANSLATION)
+        labels = candidate.split(".")
+        if any(label.startswith("-") or label.endswith("-") for label in labels):
+            continue
+        try:
+            encoded_labels = [label.encode("idna").decode("ascii") for label in labels]
+        except UnicodeError:
+            continue
+        if any(not 1 <= len(label) <= 63 for label in encoded_labels):
+            continue
+        if len(".".join(encoded_labels)) > 253:
+            continue
+        if PUBLIC_ASCII_TLD_PATTERN.fullmatch(encoded_labels[-1]):
+            return True
     return False
 
 
@@ -243,9 +267,8 @@ def public_safety_violations(
             continue
         if isinstance(item_value, str):
             violations.extend(_string_safety_violations(item_value, path=item_path))
-            if _is_profile_limitation_path(segments) and PUBLIC_HOSTNAME_PATTERN.search(
-                item_value
-            ):
+            is_profile_limitation = _is_profile_limitation_path(segments)
+            if is_profile_limitation and _contains_public_hostname(item_value):
                 violations.append(f"{item_path}: contains public hostname")
     return violations
 

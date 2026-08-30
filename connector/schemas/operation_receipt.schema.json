@@ -134,6 +134,7 @@
       "then": {
         "properties": {
           "error": {"const": null},
+          "steps": {"minItems": 1},
           "postcondition_verdicts": {
             "minItems": 1,
             "items": {

@@ -111,6 +111,23 @@ def test_successful_receipt_rejects_unproven_postconditions(
         validate_document("operation_receipt", receipt)
 
 
+def test_successful_receipt_requires_execution_step() -> None:
+    receipt = _receipt()
+    receipt["steps"] = []
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="steps"):
+        validate_document("operation_receipt", receipt)
+
+
+@pytest.mark.parametrize("outcome", ["failed", "cancelled"])
+def test_pre_execution_non_success_receipt_may_have_no_steps(outcome: str) -> None:
+    receipt = _receipt(outcome)
+    receipt["steps"] = []
+    receipt["postcondition_verdicts"] = []
+    receipt = attach_digest(receipt, "receipt_digest")
+    validate_document("operation_receipt", receipt)
+
+
 def test_failed_receipt_may_preserve_unknown_postcondition() -> None:
     receipt = _receipt("failed")
     receipt["postcondition_verdicts"] = []
