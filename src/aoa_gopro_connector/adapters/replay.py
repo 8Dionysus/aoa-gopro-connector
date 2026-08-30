@@ -7,13 +7,14 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from ..digest import canonical_digest
 from ..errors import ContractError
 from ..json_io import strict_json_dumps, strict_json_loads
 from ..redaction import assert_public_safe
 from .base import ALLOWED_READ_PATHS
 
 
-FIXTURE_FIELDS = {"schema_version", "fixture_id", "context", "responses"}
+FIXTURE_FIELDS = {"schema_version", "context", "responses"}
 CONTEXT_FIELDS = {
     "observed_at",
     "topology",
@@ -59,6 +60,7 @@ class ReplayReadAdapter:
             )
         assert_public_safe(fixture)
         self.fixture = fixture
+        self.fixture_digest = canonical_digest(fixture)
         self._responses = responses
 
     @classmethod

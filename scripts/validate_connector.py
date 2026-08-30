@@ -202,7 +202,7 @@ def _fixture_context(adapter: ReplayReadAdapter) -> ProbeContext:
         discovery=tuple(context["discovery"]),
         protocol_version=context["protocol_version"],
         firmware_posture=context["firmware_posture"],
-        evidence_ref=f"fixture:{adapter.fixture['fixture_id']}",
+        evidence_ref=f"fixture:{adapter.fixture_digest}",
     )
 
 

@@ -1,6 +1,5 @@
 {
   "schema_version": "aoa_gopro_read_replay_fixture_v1",
-  "fixture_id": "hero13-stock-2.10.00-usb-ncm-public-safe-v1",
   "context": {
     "observed_at": "2026-08-29T22:40:00-06:00",
     "topology": "usb_ncm_http",

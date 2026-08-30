@@ -16,7 +16,10 @@ from aoa_gopro_connector.schema import validate_document
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "connector/fixtures/hero13/stock-usb-ncm-read-only.json"
 REPLAY_PROFILE_DIGEST = (
-    "sha256:4effa228cca948effb4d3a75d5197a03e4db285864b1c879b24de26629df7ac7"
+    "sha256:936be8401ca039a5a600471e6d98b819113bd2607317ba733ba98bd17806eec1"
+)
+REPLAY_FIXTURE_DIGEST = (
+    "sha256:8ab82b45ab6421e2b1c3cfe0e521ed3c29c43817281040b58364712dfdafab3e"
 )
 
 
@@ -28,7 +31,7 @@ def _context(adapter: ReplayReadAdapter) -> ProbeContext:
         discovery=tuple(value["discovery"]),
         protocol_version=value["protocol_version"],
         firmware_posture=value["firmware_posture"],
-        evidence_ref=f"fixture:{adapter.fixture['fixture_id']}",
+        evidence_ref=f"fixture:{adapter.fixture_digest}",
     )
 
 
@@ -38,6 +41,7 @@ def test_replay_builds_content_addressed_public_profile() -> None:
     validate_document("capability_profile", profile)
     verify_digest(profile, "profile_digest")
     assert profile["profile_digest"] == REPLAY_PROFILE_DIGEST
+    assert profile["evidence_refs"][-1] == f"fixture:{REPLAY_FIXTURE_DIGEST}"
     assert_public_safe(profile)
     assert profile["camera"]["firmware_release_version"] == "2.10.00"
     assert profile["posture"] == "sanitized_replay"
@@ -65,6 +69,11 @@ def test_replay_fixture_rejects_unknown_public_fields() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["context"]["note"] = "kitchen-camera.home.arpa"
     with pytest.raises(ContractError, match="replay context fields differ"):
+        ReplayReadAdapter(value)
+
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["fixture_id"] = "kitchen-hero13"
+    with pytest.raises(ContractError, match="replay fixture fields differ"):
         ReplayReadAdapter(value)
 
 

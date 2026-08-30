@@ -101,16 +101,13 @@ def _replay_probe(args: argparse.Namespace) -> dict[str, Any]:
         not isinstance(item, str) or not item.strip() for item in discovery
     ):
         raise ContractError("replay fixture context discovery must be a string list")
-    fixture_id = fixture.get("fixture_id")
-    if not isinstance(fixture_id, str) or not fixture_id.strip():
-        raise ContractError("replay fixture_id is invalid")
     context = ProbeContext(
         observed_at=string_fields["observed_at"],
         topology=string_fields["topology"],
         discovery=tuple(discovery),
         protocol_version=string_fields["protocol_version"],
         firmware_posture=string_fields["firmware_posture"],
-        evidence_ref=f"fixture:{fixture_id}",
+        evidence_ref=f"fixture:{adapter.fixture_digest}",
     )
     return build_capability_profile(adapter, context)
 
