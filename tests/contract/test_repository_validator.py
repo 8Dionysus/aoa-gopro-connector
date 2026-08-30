@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -114,8 +116,13 @@ def test_repository_validator_rejects_force_tracked_private_media(
     )
 
 
-def test_repository_validator_rejects_force_tracked_certificate(
+@pytest.mark.parametrize(
+    "relative_path",
+    ["tests/camera-private-key.pem", "tests/camera-private.p8"],
+)
+def test_repository_validator_rejects_force_tracked_credential_or_certificate(
     tmp_path: Path,
+    relative_path: str,
 ) -> None:
     repo_copy = tmp_path / "repo"
     shutil.copytree(
@@ -130,10 +137,10 @@ def test_repository_validator_rejects_force_tracked_certificate(
         ),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
-    certificate = repo_copy / "tests/camera-private-key.pem"
-    certificate.write_bytes(b"synthetic private material")
+    certificate = repo_copy / relative_path
+    certificate.write_bytes(b"synthetic binary private material")
     subprocess.run(
-        ["git", "add", "-f", "tests/camera-private-key.pem"],
+        ["git", "add", "-f", relative_path],
         cwd=repo_copy,
         check=True,
     )
@@ -144,7 +151,7 @@ def test_repository_validator_rejects_force_tracked_certificate(
     assert payload["status"] == "error"
     assert (
         "forbidden credential/certificate file in repository: "
-        "tests/camera-private-key.pem"
+        + relative_path
         in payload["errors"]
     )
 

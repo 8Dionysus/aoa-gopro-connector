@@ -108,6 +108,8 @@ def _parse_rfc3339(value: str) -> Rfc3339Instant:
     offset = match["offset"]
     offset_seconds = 0
     if offset.casefold() != "z":
+        if offset == "-00:00":
+            raise ValueError("RFC 3339 unknown local offset is not an instant")
         offset_hour = int(offset[1:3])
         offset_minute = int(offset[4:6])
         if offset_hour > 23 or offset_minute > 59:

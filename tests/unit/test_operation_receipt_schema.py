@@ -261,6 +261,14 @@ def test_receipt_timeline_accepts_lowercase_rfc3339_utc_suffix() -> None:
     validate_document("operation_receipt", receipt)
 
 
+def test_receipt_timeline_rejects_unknown_rfc3339_offset() -> None:
+    receipt = _receipt()
+    receipt["started_at"] = "2026-08-30T05:00:00-00:00"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="started_at"):
+        validate_document("operation_receipt", receipt)
+
+
 def test_receipt_timeline_orders_rfc3339_leap_second() -> None:
     receipt = _receipt()
     receipt["started_at"] = "1990-12-31T23:59:59Z"

@@ -216,6 +216,20 @@ def test_date_time_formats_are_enforced() -> None:
             validate_document(schema_name, document)
 
 
+def test_packet_timestamps_reject_unknown_rfc3339_offset() -> None:
+    plan = _operation_plan()
+    plan["deadline"] = "2026-08-30T05:00:00-00:00"
+    plan = attach_digest(plan, "plan_digest")
+    with pytest.raises(ContractError, match="deadline"):
+        validate_document("operation_plan", plan)
+
+    event = _event()
+    event["wall_time"] = "2026-08-30T05:00:00-00:00"
+    event = attach_digest(event, "event_digest")
+    with pytest.raises(ContractError, match="wall_time"):
+        validate_document("event", event)
+
+
 def test_event_and_media_contracts() -> None:
     validate_document("event", _event())
     validate_document("media_manifest", _media_manifest())

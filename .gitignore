@@ -37,10 +37,14 @@
 *.key
 *.keystore
 *.p12
+*.p8
 *.p7b
 *.p7c
 *.pem
+*.pk8
+*.pkcs8
 *.pfx
+*.ppk
 .env
 .env.*
 !.env.example
