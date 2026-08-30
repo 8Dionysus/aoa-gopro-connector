@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import socket
 import threading
@@ -230,4 +231,30 @@ def test_http_adapter_disables_ambient_proxies(monkeypatch: pytest.MonkeyPatch) 
 def test_redirect_handler_fails_closed(redirect_server: str) -> None:
     adapter = HTTPReadAdapter(redirect_server)
     with pytest.raises(TransportError):
+        adapter.get_json("/gopro/camera/info")
+
+
+def test_incomplete_http_response_is_a_transport_error() -> None:
+    class IncompleteResponse:
+        def __enter__(self) -> "IncompleteResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, _size: int) -> bytes:
+            raise http.client.IncompleteRead(b'{"partial":', 10)
+
+    class IncompleteOpener:
+        def open(
+            self,
+            request: urllib.request.Request,
+            *,
+            timeout: float,
+        ) -> IncompleteResponse:
+            return IncompleteResponse()
+
+    adapter = HTTPReadAdapter("http://127.0.0.1")
+    adapter._opener = IncompleteOpener()
+    with pytest.raises(TransportError, match="read endpoint failed"):
         adapter.get_json("/gopro/camera/info")

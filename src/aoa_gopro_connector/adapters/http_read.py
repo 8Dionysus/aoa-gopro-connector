@@ -164,7 +164,7 @@ class HTTPReadAdapter:
                 payload = response.read(MAX_RESPONSE_BYTES + 1)
         except (
             urllib.error.URLError,
-            http.client.InvalidURL,
+            http.client.HTTPException,
             TimeoutError,
             OSError,
             TransportError,

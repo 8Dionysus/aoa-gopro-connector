@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import SchemaError
 
 from .errors import ContractError
 from .json_io import strict_json_loads
@@ -57,7 +58,10 @@ def load_schema(name: str) -> dict[str, Any]:
         raise ContractError(f"invalid schema file {path.name}") from exc
     if not isinstance(value, dict):
         raise ContractError(f"schema {path.name} is not an object")
-    Draft202012Validator.check_schema(value)
+    try:
+        Draft202012Validator.check_schema(value)
+    except SchemaError as exc:
+        raise ContractError(f"invalid schema definition {path.name}") from exc
     return value
 
 

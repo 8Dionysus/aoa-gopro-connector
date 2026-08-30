@@ -19,6 +19,28 @@ def test_doctor_is_offline_and_has_no_effect_surface(capsys) -> None:
     assert payload["live_routes"] == "read_only_allowlist"
 
 
+def test_doctor_invalid_schema_definition_emits_structured_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:
+    schema_root = tmp_path / "schemas"
+    schema_root.mkdir()
+    (schema_root / "camera_state.schema.json").write_text(
+        '{"type": 42}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AOA_GOPRO_SCHEMA_ROOT", str(schema_root))
+
+    assert main(["doctor"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ContractError"
+    assert "invalid schema definition" in payload["message"]
+
+
 def test_replay_cli_emits_profile(capsys) -> None:
     fixture = REPO_ROOT / "connector/fixtures/hero13/stock-usb-ncm-read-only.json"
     assert main(["replay-probe", str(fixture)]) == 0
