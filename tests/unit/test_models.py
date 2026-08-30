@@ -74,6 +74,24 @@ def test_schema_rejects_control_ready_without_power_on() -> None:
         validate_document("camera_state", document)
 
 
+def test_powered_off_state_requires_offline_network_in_model_and_schema() -> None:
+    state = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.OFF,
+        network=Network.READY,
+    )
+    with pytest.raises(ContractError, match="power=off"):
+        state.validate()
+
+    document = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.OFF,
+    ).as_dict()
+    document["network"] = "ready"
+    with pytest.raises(ContractError, match="network"):
+        validate_document("camera_state", document)
+
+
 def test_capability_profile_id_is_derived_from_sanitized_fields() -> None:
     assert (
         canonical_profile_id(

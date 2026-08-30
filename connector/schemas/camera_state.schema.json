@@ -53,6 +53,13 @@
     },
     {
       "if": {
+        "properties": {"power": {"const": "off"}},
+        "required": ["power"]
+      },
+      "then": {"properties": {"network": {"const": "offline"}}}
+    },
+    {
+      "if": {
         "anyOf": [
           {"properties": {"previewing": {"const": true}}, "required": ["previewing"]},
           {"properties": {"recording": {"const": true}}, "required": ["recording"]}
