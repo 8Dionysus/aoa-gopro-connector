@@ -140,6 +140,32 @@ def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
             "operation_receipt validation failed at after.observed_at: "
             "must not precede before.observed_at"
         )
+    started_at = _rfc3339_datetime(
+        document["started_at"],
+        schema_name="operation_receipt",
+        field="started_at",
+    )
+    if observed["before"] > started_at:
+        raise ContractError(
+            "operation_receipt validation failed at before.observed_at: "
+            "must not postdate started_at"
+        )
+    if observed["after"] < started_at:
+        raise ContractError(
+            "operation_receipt validation failed at after.observed_at: "
+            "must not predate started_at"
+        )
+    for index, step in enumerate(document["steps"]):
+        step_observed_at = _rfc3339_datetime(
+            step["observed_at"],
+            schema_name="operation_receipt",
+            field=f"steps.{index}.observed_at",
+        )
+        if observed["after"] < step_observed_at:
+            raise ContractError(
+                "operation_receipt validation failed at after.observed_at: "
+                f"must not predate steps.{index}.observed_at"
+            )
     finished_at = _rfc3339_datetime(
         document["finished_at"],
         schema_name="operation_receipt",

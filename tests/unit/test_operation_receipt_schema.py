@@ -234,3 +234,29 @@ def test_receipt_rejects_after_snapshot_after_completion() -> None:
     receipt = attach_digest(receipt, "receipt_digest")
     with pytest.raises(ContractError, match="after.observed_at"):
         validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_before_snapshot_after_start() -> None:
+    receipt = _receipt()
+    receipt["before"]["observed_at"] = "2026-08-30T05:00:01Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="before.observed_at"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_after_snapshot_before_start() -> None:
+    receipt = _receipt()
+    receipt["before"]["observed_at"] = "2026-08-30T04:59:58Z"
+    receipt["after"]["observed_at"] = "2026-08-30T04:59:59Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="after.observed_at"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_after_snapshot_before_execution_step() -> None:
+    receipt = _receipt()
+    receipt["after"]["observed_at"] = "2026-08-30T05:00:00Z"
+    receipt["steps"][0]["observed_at"] = "2026-08-30T05:00:01Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="steps.0.observed_at"):
+        validate_document("operation_receipt", receipt)

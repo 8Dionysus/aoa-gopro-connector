@@ -349,6 +349,15 @@ def test_capability_profile_rejects_ipv4_shaped_protocol_version() -> None:
         validate_document("capability_profile", profile)
 
 
+def test_capability_profile_rejects_unpublished_api_spec_version() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["api"]["spec_version"] = "owned-camera.example.com"
+    profile = attach_digest(profile, "profile_digest")
+    with pytest.raises(ContractError, match="api.spec_version"):
+        validate_document("capability_profile", profile)
+
+
 def test_capability_profile_rejects_noncanonical_profile_id() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))
