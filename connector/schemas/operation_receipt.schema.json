@@ -150,7 +150,31 @@
               "result": {"enum": ["not_needed", "recovered"]}
             }
           }
-        }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "steps": {
+                "contains": {
+                  "properties": {"status": {"const": "succeeded"}},
+                  "required": ["status"]
+                },
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "recovery": {
+                "properties": {
+                  "attempted": {"const": true},
+                  "result": {"const": "recovered"}
+                },
+                "required": ["attempted", "result"]
+              }
+            }
+          }
+        ]
       },
       "else": {
         "properties": {

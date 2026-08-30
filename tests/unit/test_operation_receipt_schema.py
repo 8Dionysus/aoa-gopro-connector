@@ -119,6 +119,32 @@ def test_successful_receipt_requires_execution_step() -> None:
         validate_document("operation_receipt", receipt)
 
 
+@pytest.mark.parametrize(
+    "status",
+    ["failed", "cancelled", "indeterminate", "skipped"],
+)
+def test_successful_receipt_requires_success_or_recovered_execution(
+    status: str,
+) -> None:
+    receipt = _receipt()
+    receipt["steps"][0]["status"] = status
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError):
+        validate_document("operation_receipt", receipt)
+
+
+def test_successful_receipt_accepts_explicitly_recovered_execution() -> None:
+    receipt = _receipt()
+    receipt["steps"][0]["status"] = "indeterminate"
+    receipt["recovery"] = {
+        "attempted": True,
+        "attempt_count": 1,
+        "result": "recovered",
+    }
+    receipt = attach_digest(receipt, "receipt_digest")
+    validate_document("operation_receipt", receipt)
+
+
 @pytest.mark.parametrize("outcome", ["failed", "cancelled"])
 def test_pre_execution_non_success_receipt_may_have_no_steps(outcome: str) -> None:
     receipt = _receipt(outcome)

@@ -92,7 +92,10 @@
       "required": ["required", "approval_ref"],
       "properties": {
         "required": {"const": true},
-        "approval_ref": {"type": "string", "minLength": 1}
+        "approval_ref": {
+          "type": "string",
+          "pattern": "^approval:[a-z0-9][a-z0-9._:-]+$"
+        }
       }
     },
     "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}

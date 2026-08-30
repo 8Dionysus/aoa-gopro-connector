@@ -78,6 +78,20 @@ def test_profile_limitation_allows_dotted_numeric_version() -> None:
     assert_public_safe({"limitations": ["Stock firmware 2.10.00 was observed."]})
 
 
+@pytest.mark.parametrize(
+    "limitation",
+    [
+        "Wi-Fi password: correct horse battery staple",
+        "Observed SSID: owned-camera-network",
+        "API token = synthetic-secret-value",
+        "Camera serial number was C1234567890123",
+    ],
+)
+def test_profile_limitation_rejects_sensitive_prose(limitation: str) -> None:
+    with pytest.raises(PublicSafetyError, match="sensitive"):
+        assert_public_safe({"limitations": [limitation]})
+
+
 def test_public_safety_rejects_excessive_nesting_without_recursion() -> None:
     root: dict[str, object] = {}
     cursor = root

@@ -167,6 +167,15 @@ def test_all_effects_require_exact_approval(effect_kind: str) -> None:
     validate_document("operation_plan", plan)
 
 
+@pytest.mark.parametrize("approval_ref", ["   ", "operator-approved"])
+def test_operation_plan_requires_canonical_approval_ref(approval_ref: str) -> None:
+    plan = _operation_plan()
+    plan["approval"]["approval_ref"] = approval_ref
+    plan = attach_digest(plan, "plan_digest")
+    with pytest.raises(ContractError, match="approval.approval_ref"):
+        validate_document("operation_plan", plan)
+
+
 def test_date_time_formats_are_enforced() -> None:
     for schema_name, document, field in (
         ("operation_plan", _operation_plan(), "deadline"),

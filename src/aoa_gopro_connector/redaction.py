@@ -268,6 +268,10 @@ def public_safety_violations(
         if isinstance(item_value, str):
             violations.extend(_string_safety_violations(item_value, path=item_path))
             is_profile_limitation = _is_profile_limitation_path(segments)
+            if is_profile_limitation and _is_sensitive_key(item_value):
+                violations.append(
+                    f"{item_path}: contains sensitive identity/credential marker"
+                )
             if is_profile_limitation and _contains_public_hostname(item_value):
                 violations.append(f"{item_path}: contains public hostname")
     return violations
