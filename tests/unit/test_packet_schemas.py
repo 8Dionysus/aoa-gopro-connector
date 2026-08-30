@@ -40,7 +40,10 @@ def _operation_plan(effect_kind: str = "record.start") -> dict[str, object]:
         ],
         "privacy_consequence": "synthetic fixture only",
         "retention_consequence": "inventory only",
-        "approval": {"required": False, "approval_ref": None},
+        "approval": {
+            "required": True,
+            "approval_ref": "approval:fixture-operator",
+        },
         "plan_digest": ZERO_DIGEST,
     }
 
@@ -115,13 +118,14 @@ def test_operation_plan_requires_one_held_lease(
 @pytest.mark.parametrize(
     "effect_kind",
     [
+        "record.start",
         "firmware.install",
         "firmware.update",
         "factory.reset",
         "media.delete.irreversible",
     ],
 )
-def test_irreversible_effects_require_exact_approval(effect_kind: str) -> None:
+def test_all_effects_require_exact_approval(effect_kind: str) -> None:
     plan = _operation_plan(effect_kind)
     plan["approval"] = {
         "required": False,

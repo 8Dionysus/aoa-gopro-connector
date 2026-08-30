@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import http.client
 import ipaddress
 import math
@@ -42,6 +43,12 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         raise TransportError("HTTP redirects are denied by the read contract")
 
 
+@dataclass(frozen=True, slots=True)
+class _ValidatedBaseURL:
+    endpoint: str
+    host_header: str
+
+
 def _is_allowed_local_address(value: str) -> bool:
     try:
         address = ipaddress.ip_address(value.split("%", maxsplit=1)[0])
@@ -50,19 +57,43 @@ def _is_allowed_local_address(value: str) -> bool:
     return any(address in network for network in ALLOWED_LOCAL_NETWORKS)
 
 
-def _validate_mdns_resolution(hostname: str, port: int) -> None:
+def _validate_mdns_resolution(hostname: str, port: int) -> str:
     try:
         results = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
     except socket.gaierror as exc:
         raise ContractError("camera mDNS hostname could not be resolved") from exc
-    addresses = {result[4][0] for result in results if result[4]}
+    addresses: set[str] = set()
+    for family, _socket_type, _protocol, _canonical_name, socket_address in results:
+        if not socket_address:
+            continue
+        address = socket_address[0]
+        if (
+            family == socket.AF_INET6
+            and len(socket_address) >= 4
+            and socket_address[3]
+            and "%" not in address
+        ):
+            address = f"{address}%{socket_address[3]}"
+        addresses.add(address)
     if not addresses:
         raise ContractError("camera mDNS hostname resolved to no addresses")
     if any(not _is_allowed_local_address(address) for address in addresses):
         raise ContractError("camera mDNS hostname resolved outside local address space")
+    return min(addresses, key=lambda address: (":" in address, address))
 
 
-def _validate_base_url(base_url: str) -> str:
+def _url_hostname(hostname: str) -> str:
+    if ":" not in hostname:
+        return hostname
+    return f"[{hostname.replace('%', '%25')}]"
+
+
+def _host_header(hostname: str, port: int | None) -> str:
+    authority = f"[{hostname}]" if ":" in hostname else hostname
+    return f"{authority}:{port}" if port is not None else authority
+
+
+def _validate_base_url(base_url: str) -> _ValidatedBaseURL:
     parsed = urlparse(base_url)
     if parsed.scheme != "http":
         raise ContractError("camera base URL must use http")
@@ -82,13 +113,19 @@ def _validate_base_url(base_url: str) -> str:
     except ValueError:
         if not LOCAL_MDNS_HOST_PATTERN.fullmatch(hostname):
             raise ContractError("camera hostname must be a valid local mDNS name")
-        _validate_mdns_resolution(hostname, 80 if port_number is None else port_number)
+        pinned_hostname = _validate_mdns_resolution(
+            hostname,
+            80 if port_number is None else port_number,
+        )
     else:
         if not _is_allowed_local_address(str(address)):
             raise ContractError("camera address must be private, link-local, or loopback")
+        pinned_hostname = hostname
     port = f":{port_number}" if port_number is not None else ""
-    normalized_hostname = f"[{hostname}]" if ":" in hostname else hostname
-    return f"http://{normalized_hostname}{port}"
+    return _ValidatedBaseURL(
+        endpoint=f"http://{_url_hostname(pinned_hostname)}{port}",
+        host_header=_host_header(hostname, port_number),
+    )
 
 
 class HTTPReadAdapter:
@@ -99,7 +136,9 @@ class HTTPReadAdapter:
             or timeout_seconds > 30
         ):
             raise ContractError("timeout must be finite and within (0, 30] seconds")
-        self._base_url = _validate_base_url(base_url)
+        validated_url = _validate_base_url(base_url)
+        self._base_url = validated_url.endpoint
+        self._host_header = validated_url.host_header
         self._timeout_seconds = timeout_seconds
         self._opener = urllib.request.build_opener(
             urllib.request.ProxyHandler({}),
@@ -112,7 +151,7 @@ class HTTPReadAdapter:
         request = urllib.request.Request(
             f"{self._base_url}{path}",
             method="GET",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "Host": self._host_header},
         )
         try:
             with self._opener.open(request, timeout=self._timeout_seconds) as response:

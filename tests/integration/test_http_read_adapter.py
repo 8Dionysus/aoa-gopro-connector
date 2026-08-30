@@ -5,6 +5,7 @@ import socket
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 
 import pytest
 
@@ -124,17 +125,39 @@ def test_malformed_mdns_hostname_is_a_contract_error(base_url: str) -> None:
         HTTPReadAdapter(base_url)
 
 
-def test_valid_mdns_hostname_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        socket,
-        "getaddrinfo",
-        lambda *args, **kwargs: [
-            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.2", 8080))
-        ],
-    )
-    assert _validate_base_url("http://camera-name.local:8080") == (
-        "http://camera-name.local:8080"
-    )
+def test_mdns_address_is_pinned_while_host_header_is_preserved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resolution_count = 0
+
+    def changing_resolution(*args: object, **kwargs: object) -> object:
+        nonlocal resolution_count
+        resolution_count += 1
+        address = "192.168.1.2" if resolution_count == 1 else "8.8.8.8"
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, 8080))]
+
+    class RecordingOpener:
+        request: urllib.request.Request | None = None
+
+        def open(
+            self,
+            request: urllib.request.Request,
+            *,
+            timeout: float,
+        ) -> BytesIO:
+            self.request = request
+            return BytesIO(b'{"status": "ok"}')
+
+    monkeypatch.setattr(socket, "getaddrinfo", changing_resolution)
+    adapter = HTTPReadAdapter("http://camera-name.local:8080")
+    opener = RecordingOpener()
+    adapter._opener = opener
+
+    assert adapter.get_json("/gopro/camera/info") == {"status": "ok"}
+    assert resolution_count == 1
+    assert opener.request is not None
+    assert opener.request.full_url == "http://192.168.1.2:8080/gopro/camera/info"
+    assert opener.request.get_header("Host") == "camera-name.local:8080"
 
 
 def test_mdns_hostname_resolving_public_address_is_rejected(
@@ -179,7 +202,7 @@ def test_non_finite_timeout_is_a_contract_error(timeout_seconds: float) -> None:
     ],
 )
 def test_ipv6_base_url_preserves_brackets(base_url: str, expected: str) -> None:
-    assert _validate_base_url(base_url) == expected
+    assert _validate_base_url(base_url).endpoint == expected
 
 
 def test_http_adapter_disables_ambient_proxies(monkeypatch: pytest.MonkeyPatch) -> None:
