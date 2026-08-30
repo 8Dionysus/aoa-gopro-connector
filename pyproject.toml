@@ -15,7 +15,13 @@ dependencies = ["jsonschema>=4.23,<5"]
 
 [project.optional-dependencies]
 opengopro = ["open-gopro==0.22.0; python_version < '3.14'"]
-dev = ["build>=1.2", "pytest>=8", "ruff>=0.15"]
+dev = [
+  "build>=1.2",
+  "pytest>=8",
+  "ruff>=0.15",
+  "setuptools>=77",
+  "wheel>=0.45",
+]
 
 [project.scripts]
 aoa-gopro = "aoa_gopro_connector.cli:main"

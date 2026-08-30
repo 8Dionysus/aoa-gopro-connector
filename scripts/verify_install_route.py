@@ -34,13 +34,20 @@ def _ignore(_directory: str, names: list[str]) -> set[str]:
 
 
 def _run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        return subprocess.run(
+            command,
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        if exc.stdout:
+            print(exc.stdout, file=sys.stderr, end="")
+        if exc.stderr:
+            print(exc.stderr, file=sys.stderr, end="")
+        raise
 
 
 def main() -> int:
