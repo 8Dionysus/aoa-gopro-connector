@@ -126,6 +126,18 @@ def test_operation_plan_contract() -> None:
                 "observation_ref": "observation:fixture-lease-two",
             },
         ],
+        [
+            {
+                "kind": "lease",
+                "expected": "held",
+                "observation_ref": "observation:fixture-lease-held",
+            },
+            {
+                "kind": "lease",
+                "expected": "missing",
+                "observation_ref": "observation:fixture-lease-missing",
+            },
+        ],
     ],
 )
 def test_operation_plan_requires_one_held_lease(
@@ -200,10 +212,45 @@ def test_event_rejects_expiration_before_observation() -> None:
 
 def test_event_freshness_compares_instants_across_offsets() -> None:
     event = _event()
+    event["wall_time"] = "2026-08-30T04:00:00Z"
     event["freshness"]["observed_at"] = "2026-08-30T05:00:00+01:00"
     event["freshness"]["expires_at"] = "2026-08-30T04:00:00Z"
     event = attach_digest(event, "event_digest")
     validate_document("event", event)
+
+
+def test_current_event_rejects_expiry_before_envelope_time() -> None:
+    event = _event()
+    event["wall_time"] = "2026-08-30T05:00:02Z"
+    event["freshness"]["expires_at"] = "2026-08-30T05:00:01Z"
+    event = attach_digest(event, "event_digest")
+    with pytest.raises(ContractError, match="freshness.posture"):
+        validate_document("event", event)
+
+
+def test_stale_event_requires_expiry_before_envelope_time() -> None:
+    event = _event()
+    event["wall_time"] = "2026-08-30T05:00:02Z"
+    event["freshness"] = {
+        "observed_at": "2026-08-30T05:00:00Z",
+        "expires_at": "2026-08-30T05:00:01Z",
+        "posture": "stale",
+    }
+    event = attach_digest(event, "event_digest")
+    validate_document("event", event)
+
+    event["freshness"]["expires_at"] = None
+    event = attach_digest(event, "event_digest")
+    with pytest.raises(ContractError, match="freshness.posture"):
+        validate_document("event", event)
+
+
+def test_event_envelope_rejects_wall_time_before_observation() -> None:
+    event = _event()
+    event["wall_time"] = "2026-08-30T04:59:59Z"
+    event = attach_digest(event, "event_digest")
+    with pytest.raises(ContractError, match="wall_time"):
+        validate_document("event", event)
 
 
 def test_event_freshness_accepts_lowercase_rfc3339_utc_suffix() -> None:

@@ -56,7 +56,16 @@
           "kind": {"type": "string", "minLength": 1},
           "expected": {},
           "observation_ref": {"type": "string", "minLength": 1}
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"kind": {"const": "lease"}},
+              "required": ["kind"]
+            },
+            "then": {"properties": {"expected": {"const": "held"}}}
+          }
+        ]
       }
     },
     "deadline": {"type": "string", "format": "date-time"},

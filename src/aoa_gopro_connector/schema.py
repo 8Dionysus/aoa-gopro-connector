@@ -263,13 +263,28 @@ def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
 
 def _validate_event_freshness(document: dict[str, Any]) -> None:
     freshness = document["freshness"]
+    wall_time = _rfc3339_datetime(
+        document["wall_time"],
+        schema_name="event",
+        field="wall_time",
+    )
     observed_at = _rfc3339_datetime(
         freshness["observed_at"],
         schema_name="event",
         field="freshness.observed_at",
     )
+    if wall_time < observed_at:
+        raise ContractError(
+            "event validation failed at wall_time: "
+            "must not precede freshness.observed_at"
+        )
     expires_value = freshness["expires_at"]
     if expires_value is None:
+        if freshness["posture"] == "stale":
+            raise ContractError(
+                "event validation failed at freshness.posture: "
+                "stale requires expires_at"
+            )
         return
     expires_at = _rfc3339_datetime(
         expires_value,
@@ -280,6 +295,16 @@ def _validate_event_freshness(document: dict[str, Any]) -> None:
         raise ContractError(
             "event validation failed at freshness.expires_at: "
             "must not precede freshness.observed_at"
+        )
+    if freshness["posture"] == "current" and expires_at < wall_time:
+        raise ContractError(
+            "event validation failed at freshness.posture: "
+            "current event is expired at wall_time"
+        )
+    if freshness["posture"] == "stale" and expires_at >= wall_time:
+        raise ContractError(
+            "event validation failed at freshness.posture: "
+            "stale event is not expired at wall_time"
         )
 
 
