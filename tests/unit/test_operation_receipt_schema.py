@@ -201,6 +201,38 @@ def test_receipt_timeline_accepts_lowercase_rfc3339_utc_suffix() -> None:
     validate_document("operation_receipt", receipt)
 
 
+def test_receipt_timeline_orders_rfc3339_leap_second() -> None:
+    receipt = _receipt()
+    receipt["started_at"] = "1990-12-31T23:59:59Z"
+    receipt["finished_at"] = "1991-01-01T00:00:00Z"
+    receipt["steps"][0]["observed_at"] = "1990-12-31T23:59:60Z"
+    receipt["before"]["observed_at"] = "1990-12-31T23:59:59Z"
+    receipt["after"]["observed_at"] = "1991-01-01T00:00:00Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_steps_in_reverse_chronological_order() -> None:
+    receipt = _receipt()
+    receipt["steps"] = [
+        {
+            "step_id": "effect-acknowledged",
+            "status": "succeeded",
+            "observed_at": "2026-08-30T05:00:01Z",
+            "observation_ref": "observation:fixture-ack",
+        },
+        {
+            "step_id": "effect-sent",
+            "status": "succeeded",
+            "observed_at": "2026-08-30T05:00:00Z",
+            "observation_ref": "observation:fixture-send",
+        },
+    ]
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="steps.1.observed_at"):
+        validate_document("operation_receipt", receipt)
+
+
 @pytest.mark.parametrize(
     "observed_at",
     ["2026-08-30T04:59:59Z", "2026-08-30T05:00:02Z"],

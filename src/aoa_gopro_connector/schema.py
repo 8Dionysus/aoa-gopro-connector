@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
+from decimal import Decimal
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,13 @@ PACKET_DIGEST_FIELDS = {
     "event": "event_digest",
     "media_manifest": "manifest_digest",
 }
+RFC3339_PATTERN = re.compile(
+    r"^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})"
+    r"[Tt](?P<hour>[0-9]{2}):(?P<minute>[0-9]{2}):(?P<second>[0-9]{2})"
+    r"(?:\.(?P<fraction>[0-9]+))?"
+    r"(?P<offset>[Zz]|[+-][0-9]{2}:[0-9]{2})$"
+)
+Rfc3339Instant = tuple[int, int, Decimal]
 
 
 def schema_root() -> Path:
@@ -76,19 +85,80 @@ def load_schema(name: str) -> dict[str, Any]:
     return value
 
 
-def _rfc3339_datetime(value: str, *, schema_name: str, field: str) -> datetime:
-    normalized = value[:-1] + "+00:00" if value.endswith(("Z", "z")) else value
+def _parse_rfc3339(value: str) -> Rfc3339Instant:
+    match = RFC3339_PATTERN.fullmatch(value)
+    if match is None:
+        raise ValueError("value does not match the RFC 3339 grammar")
+    components = {
+        key: int(match[key])
+        for key in ("year", "month", "day", "hour", "minute", "second")
+    }
+    calendar_date = date(
+        components["year"],
+        components["month"],
+        components["day"],
+    )
+    if components["hour"] > 23:
+        raise ValueError("RFC 3339 hour is outside 00-23")
+    if components["minute"] > 59:
+        raise ValueError("RFC 3339 minute is outside 00-59")
+    if components["second"] > 60:
+        raise ValueError("RFC 3339 second is outside 00-60")
+
+    offset = match["offset"]
+    offset_seconds = 0
+    if offset.casefold() != "z":
+        offset_hour = int(offset[1:3])
+        offset_minute = int(offset[4:6])
+        if offset_hour > 23 or offset_minute > 59:
+            raise ValueError("RFC 3339 numeric offset is outside its grammar")
+        direction = 1 if offset[0] == "+" else -1
+        offset_seconds = direction * (offset_hour * 3600 + offset_minute * 60)
+
+    local_second = (
+        calendar_date.toordinal() * 86_400
+        + components["hour"] * 3600
+        + components["minute"] * 60
+        + components["second"]
+    )
+    utc_second = local_second - offset_seconds
+    leap_phase = 0
+    if components["second"] == 60:
+        utc_ordinal, utc_second_of_day = divmod(utc_second, 86_400)
+        if utc_second_of_day != 0 or date.fromordinal(utc_ordinal).day != 1:
+            raise ValueError("RFC 3339 leap second is not at a month boundary")
+        leap_phase = -1
+    fraction_text = match["fraction"]
+    fraction = Decimal(f"0.{fraction_text}") if fraction_text else Decimal(0)
+    return utc_second, leap_phase, fraction
+
+
+RFC3339_FORMAT_CHECKER = FormatChecker()
+
+
+@RFC3339_FORMAT_CHECKER.checks("date-time")
+def _is_rfc3339_datetime(value: object) -> bool:
+    if not isinstance(value, str):
+        return True
     try:
-        parsed = datetime.fromisoformat(normalized)
+        _parse_rfc3339(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _rfc3339_datetime(
+    value: str,
+    *,
+    schema_name: str,
+    field: str,
+) -> Rfc3339Instant:
+    try:
+        return _parse_rfc3339(value)
     except ValueError as exc:
         raise ContractError(
             f"{schema_name} validation failed at {field}: invalid date-time"
         ) from exc
-    if parsed.tzinfo is None:
-        raise ContractError(
-            f"{schema_name} validation failed at {field}: timezone is required"
-        )
-    return parsed
 
 
 def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
@@ -107,6 +177,7 @@ def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
             "operation_receipt validation failed at finished_at: "
             "must not precede started_at"
         )
+    previous_step_at: Rfc3339Instant | None = None
     for index, step in enumerate(document["steps"]):
         observed_at = _rfc3339_datetime(
             step["observed_at"],
@@ -118,10 +189,16 @@ def _validate_operation_receipt_timeline(document: dict[str, Any]) -> None:
                 f"operation_receipt validation failed at steps.{index}.observed_at: "
                 "must fall within started_at and finished_at"
             )
+        if previous_step_at is not None and observed_at < previous_step_at:
+            raise ContractError(
+                f"operation_receipt validation failed at steps.{index}.observed_at: "
+                "must not precede the previous step"
+            )
+        previous_step_at = observed_at
 
 
 def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
-    observed: dict[str, datetime] = {}
+    observed: dict[str, Rfc3339Instant] = {}
     for field in ("before", "after"):
         snapshot = document[field]
         observed[field] = _rfc3339_datetime(
@@ -226,7 +303,7 @@ def validate_document(name: str, document: Any) -> None:
     normalized_name = name.removesuffix(".schema.json")
     validator = Draft202012Validator(
         load_schema(name),
-        format_checker=FormatChecker(),
+        format_checker=RFC3339_FORMAT_CHECKER,
     )
     errors = sorted(validator.iter_errors(document), key=lambda item: list(item.path))
     if errors:

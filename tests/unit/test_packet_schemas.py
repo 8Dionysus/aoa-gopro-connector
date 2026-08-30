@@ -206,6 +206,23 @@ def test_event_freshness_accepts_lowercase_rfc3339_utc_suffix() -> None:
     validate_document("event", event)
 
 
+def test_event_freshness_accepts_offset_equivalent_rfc3339_leap_second() -> None:
+    event = _event()
+    event["wall_time"] = "1990-12-31T23:59:60Z"
+    event["freshness"]["observed_at"] = "1990-12-31T15:59:60-08:00"
+    event["freshness"]["expires_at"] = "1990-12-31T23:59:60Z"
+    event = attach_digest(event, "event_digest")
+    validate_document("event", event)
+
+
+def test_event_rejects_leap_second_away_from_month_boundary() -> None:
+    event = _event()
+    event["wall_time"] = "2026-08-30T05:00:60Z"
+    event = attach_digest(event, "event_digest")
+    with pytest.raises(ContractError, match="wall_time"):
+        validate_document("event", event)
+
+
 @pytest.mark.parametrize("causal_operation_id", ["", "not-an-operation"])
 def test_event_rejects_invalid_causal_operation_id(
     causal_operation_id: str,
