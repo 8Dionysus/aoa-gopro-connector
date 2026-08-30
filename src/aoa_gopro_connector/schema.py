@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 
 from .errors import ContractError
 
@@ -61,7 +61,10 @@ def load_schema(name: str) -> dict[str, Any]:
 
 
 def validate_document(name: str, document: Any) -> None:
-    validator = Draft202012Validator(load_schema(name))
+    validator = Draft202012Validator(
+        load_schema(name),
+        format_checker=FormatChecker(),
+    )
     errors = sorted(validator.iter_errors(document), key=lambda item: list(item.path))
     if errors:
         first = errors[0]

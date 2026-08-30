@@ -7,7 +7,7 @@ import pytest
 
 from aoa_gopro_connector.adapters import ReplayReadAdapter
 from aoa_gopro_connector.digest import verify_digest
-from aoa_gopro_connector.errors import PublicSafetyError
+from aoa_gopro_connector.errors import ContractError, PublicSafetyError
 from aoa_gopro_connector.probe import ProbeContext, build_capability_profile
 from aoa_gopro_connector.redaction import assert_public_safe
 from aoa_gopro_connector.schema import validate_document
@@ -50,6 +50,14 @@ def test_replay_fixture_rejects_sensitive_keys() -> None:
     value["responses"]["/gopro/camera/info"]["serial_number"] = "redacted"
     with pytest.raises(PublicSafetyError):
         ReplayReadAdapter(value)
+
+
+def test_probe_rejects_media_response_without_inventory() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"] = {"id": "fixture"}
+    adapter = ReplayReadAdapter(value)
+    with pytest.raises(ContractError, match="no media field"):
+        build_capability_profile(adapter, _context(adapter))
 
 
 def test_named_live_profile_is_valid_and_redacted() -> None:

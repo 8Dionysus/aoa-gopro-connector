@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from aoa_gopro_connector.adapters import HTTPReadAdapter
+from aoa_gopro_connector.adapters.http_read import _validate_base_url
 from aoa_gopro_connector.errors import ContractError, TransportError
 
 
@@ -91,6 +92,17 @@ def test_non_allowlisted_route_is_rejected(local_server: str) -> None:
 def test_public_address_is_rejected() -> None:
     with pytest.raises(ContractError, match="private"):
         HTTPReadAdapter("http://8.8.8.8")
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("http://[::1]", "http://[::1]"),
+        ("http://[fe80::1]:8080", "http://[fe80::1]:8080"),
+    ],
+)
+def test_ipv6_base_url_preserves_brackets(base_url: str, expected: str) -> None:
+    assert _validate_base_url(base_url) == expected
 
 
 def test_redirect_handler_fails_closed(redirect_server: str) -> None:

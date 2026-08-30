@@ -51,7 +51,9 @@ def _slug(value: str) -> str:
 
 
 def _count_media(payload: dict[str, Any]) -> tuple[int, int]:
-    groups = payload.get("media", [])
+    if "media" not in payload:
+        raise ContractError("media response has no media field")
+    groups = payload["media"]
     if not isinstance(groups, list):
         raise ContractError("media response has no list-valued media field")
     item_count = 0

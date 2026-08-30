@@ -45,6 +45,13 @@
     },
     {
       "if": {
+        "properties": {"control": {"const": "ready"}},
+        "required": ["control"]
+      },
+      "then": {"properties": {"power": {"const": "on"}}}
+    },
+    {
+      "if": {
         "anyOf": [
           {"properties": {"previewing": {"const": true}}, "required": ["previewing"]},
           {"properties": {"recording": {"const": true}}, "required": ["recording"]}

@@ -92,5 +92,38 @@
       ]
     },
     "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "effect": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "firmware.install",
+                  "firmware.update",
+                  "factory.reset",
+                  "media.delete.irreversible"
+                ]
+              }
+            },
+            "required": ["kind"]
+          }
+        },
+        "required": ["effect"]
+      },
+      "then": {
+        "properties": {
+          "approval": {
+            "properties": {
+              "required": {"const": true},
+              "approval_ref": {"type": "string", "minLength": 1}
+            },
+            "required": ["required", "approval_ref"]
+          }
+        }
+      }
+    }
+  ]
 }

@@ -41,7 +41,8 @@ def _validate_base_url(base_url: str) -> str:
         if not (address.is_private or address.is_link_local or address.is_loopback):
             raise ContractError("camera address must be private, link-local, or loopback")
     port = f":{parsed.port}" if parsed.port else ""
-    return f"http://{hostname}{port}"
+    normalized_hostname = f"[{hostname}]" if ":" in hostname else hostname
+    return f"http://{normalized_hostname}{port}"
 
 
 class HTTPReadAdapter:

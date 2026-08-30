@@ -48,3 +48,14 @@ def test_activity_requires_control_and_network() -> None:
 def test_degraded_state_requires_reason() -> None:
     with pytest.raises(ContractError, match="requires a reason"):
         CameraState(health=Health.DEGRADED).validate()
+
+
+def test_schema_rejects_control_ready_without_power_on() -> None:
+    document = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.ON,
+        control=Control.READY,
+    ).as_dict()
+    document["power"] = "off"
+    with pytest.raises(ContractError, match="power"):
+        validate_document("camera_state", document)
