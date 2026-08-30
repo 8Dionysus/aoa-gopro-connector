@@ -190,6 +190,17 @@ def test_receipt_timeline_compares_instants_across_offsets() -> None:
     validate_document("operation_receipt", receipt)
 
 
+def test_receipt_timeline_accepts_lowercase_rfc3339_utc_suffix() -> None:
+    receipt = _receipt()
+    receipt["started_at"] = "2026-08-30T05:00:00z"
+    receipt["finished_at"] = "2026-08-30T05:00:01z"
+    receipt["steps"][0]["observed_at"] = "2026-08-30T05:00:00z"
+    receipt["before"]["observed_at"] = "2026-08-30T05:00:00z"
+    receipt["after"]["observed_at"] = "2026-08-30T05:00:01z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    validate_document("operation_receipt", receipt)
+
+
 @pytest.mark.parametrize(
     "observed_at",
     ["2026-08-30T04:59:59Z", "2026-08-30T05:00:02Z"],

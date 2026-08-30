@@ -77,7 +77,7 @@ def load_schema(name: str) -> dict[str, Any]:
 
 
 def _rfc3339_datetime(value: str, *, schema_name: str, field: str) -> datetime:
-    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    normalized = value[:-1] + "+00:00" if value.endswith(("Z", "z")) else value
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as exc:
