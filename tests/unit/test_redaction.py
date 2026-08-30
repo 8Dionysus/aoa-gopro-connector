@@ -85,6 +85,14 @@ def test_profile_limitation_allows_dotted_numeric_version() -> None:
         "Observed SSID: owned-camera-network",
         "API token = synthetic-secret-value",
         "Camera serial number was C1234567890123",
+        "WPA PSK: correct horse battery staple",
+        "Admin PIN: 123456",
+        "Wi-Fi passphrase: correct horse battery staple",
+        "BLE pairing code: 123456",
+        "Pre-shared key: correct horse battery staple",
+        "Recovery code: 1234-5678",
+        "Session cookie: synthetic-cookie-value",
+        "Provisioning seed: synthetic-seed-value",
     ],
 )
 def test_profile_limitation_rejects_sensitive_prose(limitation: str) -> None:

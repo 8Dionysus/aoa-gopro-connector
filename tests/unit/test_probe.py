@@ -421,10 +421,20 @@ def test_capability_profile_rejects_public_hostname_in_limitation(
         validate_document("capability_profile", profile)
 
 
-def test_capability_profile_rejects_credential_in_limitation() -> None:
+@pytest.mark.parametrize(
+    "limitation",
+    [
+        "Wi-Fi password: correct horse battery staple",
+        "WPA PSK: correct horse battery staple",
+        "Admin PIN: 123456",
+    ],
+)
+def test_capability_profile_rejects_credential_in_limitation(
+    limitation: str,
+) -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))
-    profile["limitations"] = ["Wi-Fi password: correct horse battery staple"]
+    profile["limitations"] = [limitation]
     profile = attach_digest(profile, "profile_digest")
     with pytest.raises(PublicSafetyError, match="sensitive"):
         validate_document("capability_profile", profile)
