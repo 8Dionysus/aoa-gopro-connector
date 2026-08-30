@@ -129,12 +129,41 @@ def test_replay_fixture_rejects_non_gopro_media_directory() -> None:
 def test_replay_fixture_accepts_fixed_synthetic_media_filename() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["responses"]["/gopro/media/list"]["media"] = [
-        {"d": "100GOPRO", "fs": [{"n": "synthetic-video.mp4"}]}
+        {
+            "d": "100GOPRO",
+            "fs": [
+                {
+                    "n": "synthetic-video.mp4",
+                    "cre": "1788081600",
+                    "mod": "1788081601",
+                    "glrv": "1024",
+                    "ls": "-1",
+                }
+            ],
+        }
     ]
     adapter = ReplayReadAdapter(value)
     profile = build_capability_profile(adapter, _context(adapter))
     assert profile["observations"]["media_group_count"] == 1
     assert profile["observations"]["media_item_count"] == 1
+
+
+@pytest.mark.parametrize("field", ["cre", "mod", "glrv", "ls", "s"])
+def test_replay_fixture_rejects_identity_in_media_metadata(field: str) -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"]["media"] = [
+        {
+            "d": "100GOPRO",
+            "fs": [
+                {
+                    "n": "synthetic-video.mp4",
+                    field: "owned-camera.example.com",
+                }
+            ],
+        }
+    ]
+    with pytest.raises(ContractError, match=field):
+        ReplayReadAdapter(value)
 
 
 def test_replay_fixture_rejects_non_finite_values() -> None:

@@ -28,6 +28,15 @@ MEDIA_LIST_FIELDS = {"id", "media"}
 MEDIA_GROUP_FIELDS = {"d", "fs"}
 MEDIA_FILE_FIELDS = {"n", "cre", "mod", "glrv", "ls", "s"}
 SYNTHETIC_MEDIA_IDS = {"fixture", "fixture-empty-card"}
+MEDIA_UNSIGNED_DECIMAL_FIELDS = {"cre", "glrv", "mod", "s"}
+
+
+def _is_bounded_decimal_string(value: Any, *, allow_negative_one: bool = False) -> bool:
+    if not isinstance(value, str):
+        return False
+    if allow_negative_one and value == "-1":
+        return True
+    return 1 <= len(value) <= 20 and value.isdecimal()
 
 
 def _reject_unknown_fields(
@@ -98,6 +107,22 @@ def _validate_response_shapes(responses: dict[str, Any]) -> None:
             continue
         for item in items:
             _reject_unknown_fields(item, MEDIA_FILE_FIELDS, label="media file entry")
+            if not isinstance(item, dict):
+                continue
+            for field in MEDIA_UNSIGNED_DECIMAL_FIELDS:
+                if field in item and item[field] is not None:
+                    if not _is_bounded_decimal_string(item[field]):
+                        raise ContractError(
+                            f"media file entry {field} must be a bounded decimal string"
+                        )
+            if "ls" in item and item["ls"] is not None:
+                if not _is_bounded_decimal_string(
+                    item["ls"],
+                    allow_negative_one=True,
+                ):
+                    raise ContractError(
+                        "media file entry ls must be -1 or a bounded decimal string"
+                    )
 
 
 class ReplayReadAdapter:

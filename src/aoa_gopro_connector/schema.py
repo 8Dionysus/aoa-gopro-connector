@@ -140,6 +140,16 @@ def _validate_operation_receipt_snapshots(document: dict[str, Any]) -> None:
             "operation_receipt validation failed at after.observed_at: "
             "must not precede before.observed_at"
         )
+    finished_at = _rfc3339_datetime(
+        document["finished_at"],
+        schema_name="operation_receipt",
+        field="finished_at",
+    )
+    if observed["after"] > finished_at:
+        raise ContractError(
+            "operation_receipt validation failed at after.observed_at: "
+            "must not postdate finished_at"
+        )
 
 
 def _validate_event_freshness(document: dict[str, Any]) -> None:

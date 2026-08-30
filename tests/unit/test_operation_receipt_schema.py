@@ -184,6 +184,8 @@ def test_receipt_timeline_compares_instants_across_offsets() -> None:
     receipt["started_at"] = "2026-08-30T05:00:00+01:00"
     receipt["finished_at"] = "2026-08-30T04:00:00Z"
     receipt["steps"][0]["observed_at"] = "2026-08-30T04:00:00Z"
+    receipt["before"]["observed_at"] = "2026-08-30T05:00:00+01:00"
+    receipt["after"]["observed_at"] = "2026-08-30T04:00:00Z"
     receipt = attach_digest(receipt, "receipt_digest")
     validate_document("operation_receipt", receipt)
 
@@ -221,6 +223,14 @@ def test_receipt_rejects_reversed_state_snapshot_chronology() -> None:
     receipt = _receipt()
     receipt["before"]["observed_at"] = "2026-08-30T05:00:01Z"
     receipt["after"]["observed_at"] = "2026-08-30T05:00:00Z"
+    receipt = attach_digest(receipt, "receipt_digest")
+    with pytest.raises(ContractError, match="after.observed_at"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_receipt_rejects_after_snapshot_after_completion() -> None:
+    receipt = _receipt()
+    receipt["after"]["observed_at"] = "2026-08-30T05:00:02Z"
     receipt = attach_digest(receipt, "receipt_digest")
     with pytest.raises(ContractError, match="after.observed_at"):
         validate_document("operation_receipt", receipt)
