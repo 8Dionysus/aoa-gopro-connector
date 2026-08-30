@@ -15,6 +15,9 @@ from aoa_gopro_connector.schema import validate_document
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "connector/fixtures/hero13/stock-usb-ncm-read-only.json"
+REPLAY_PROFILE_DIGEST = (
+    "sha256:4effa228cca948effb4d3a75d5197a03e4db285864b1c879b24de26629df7ac7"
+)
 
 
 def _context(adapter: ReplayReadAdapter) -> ProbeContext:
@@ -34,6 +37,7 @@ def test_replay_builds_content_addressed_public_profile() -> None:
     profile = build_capability_profile(adapter, _context(adapter))
     validate_document("capability_profile", profile)
     verify_digest(profile, "profile_digest")
+    assert profile["profile_digest"] == REPLAY_PROFILE_DIGEST
     assert_public_safe(profile)
     assert profile["camera"]["firmware_release_version"] == "2.10.00"
     assert profile["posture"] == "sanitized_replay"
@@ -43,12 +47,24 @@ def test_replay_builds_content_addressed_public_profile() -> None:
         "network_identity_retained": False,
         "media_names_retained": False,
     }
+    assert profile["sdk"] == {
+        "published_version": "0.22.0",
+        "declared_python": ">=3.11,<3.14",
+        "posture": "optional_adapter",
+    }
 
 
 def test_replay_fixture_rejects_sensitive_keys() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["responses"]["/gopro/camera/info"]["serial_number"] = "redacted"
     with pytest.raises(PublicSafetyError):
+        ReplayReadAdapter(value)
+
+
+def test_replay_fixture_rejects_unknown_public_fields() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["context"]["note"] = "kitchen-camera.home.arpa"
+    with pytest.raises(ContractError, match="replay context fields differ"):
         ReplayReadAdapter(value)
 
 

@@ -51,12 +51,10 @@
     "network_identity_retained": false,
     "raw_responses_retained": false
   },
-  "profile_digest": "sha256:bb273b497e28e322160bb6e715aa1354f6a8e07cd6513e0805a33129c78df282",
+  "profile_digest": "sha256:39005d5dfd2043238fe95c4bd25c1c3f6abf56d24b8f08fe3bff26186f4a4634",
   "profile_id": "gopro-hero13-black-stock-2.10.00-usb-ncm-http",
   "schema_version": "aoa_gopro_capability_profile_v1",
   "sdk": {
-    "current_python": "3.14.7",
-    "current_python_compatible": false,
     "declared_python": ">=3.11,<3.14",
     "posture": "optional_adapter",
     "published_version": "0.22.0"

@@ -112,15 +112,11 @@
       "required": [
         "published_version",
         "declared_python",
-        "current_python",
-        "current_python_compatible",
         "posture"
       ],
       "properties": {
         "published_version": {"type": "string", "minLength": 1},
         "declared_python": {"type": "string", "minLength": 1},
-        "current_python": {"type": "string", "minLength": 1},
-        "current_python_compatible": {"type": "boolean"},
         "posture": {"const": "optional_adapter"}
       }
     },

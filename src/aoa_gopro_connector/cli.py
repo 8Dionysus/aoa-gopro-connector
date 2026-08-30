@@ -16,7 +16,12 @@ from .adapters import HTTPReadAdapter, ReplayReadAdapter
 from .config import resolve_storage_roots
 from .errors import ContractError, GoProConnectorError
 from .json_io import strict_json_dumps, strict_json_loads
-from .probe import ProbeContext, build_capability_profile
+from .probe import (
+    OPEN_GOPRO_DECLARED_PYTHON,
+    OPEN_GOPRO_PUBLISHED_VERSION,
+    ProbeContext,
+    build_capability_profile,
+)
 from .schema import SCHEMA_NAMES, load_schema, schema_root, validate_document
 
 
@@ -66,6 +71,9 @@ def _doctor() -> dict[str, Any]:
         "open_gopro_sdk": {
             "installed": sdk_present,
             "version": sdk_version,
+            "published_version": OPEN_GOPRO_PUBLISHED_VERSION,
+            "declared_python": OPEN_GOPRO_DECLARED_PYTHON,
+            "current_python_compatible": (3, 11) <= sys.version_info[:2] < (3, 14),
             "required_for_phase_0_usb_read": False,
         },
     }

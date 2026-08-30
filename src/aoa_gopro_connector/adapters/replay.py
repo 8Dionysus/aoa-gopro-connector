@@ -13,14 +13,41 @@ from ..redaction import assert_public_safe
 from .base import ALLOWED_READ_PATHS
 
 
+FIXTURE_FIELDS = {"schema_version", "fixture_id", "context", "responses"}
+CONTEXT_FIELDS = {
+    "observed_at",
+    "topology",
+    "discovery",
+    "protocol_version",
+    "firmware_posture",
+}
+
+
 class ReplayReadAdapter:
     def __init__(self, fixture: dict[str, Any]) -> None:
         try:
             strict_json_dumps(fixture)
         except (TypeError, ValueError) as exc:
             raise ContractError("replay fixture contains non-JSON values") from exc
+        fixture_fields = set(fixture)
+        if fixture_fields != FIXTURE_FIELDS:
+            raise ContractError(
+                "replay fixture fields differ: "
+                f"missing={sorted(FIXTURE_FIELDS - fixture_fields)}, "
+                f"unknown={sorted(fixture_fields - FIXTURE_FIELDS)}"
+            )
         if fixture.get("schema_version") != "aoa_gopro_read_replay_fixture_v1":
             raise ContractError("unsupported replay fixture schema")
+        context = fixture.get("context")
+        if not isinstance(context, dict):
+            raise ContractError("replay fixture has no context object")
+        context_fields = set(context)
+        if context_fields != CONTEXT_FIELDS:
+            raise ContractError(
+                "replay context fields differ: "
+                f"missing={sorted(CONTEXT_FIELDS - context_fields)}, "
+                f"unknown={sorted(context_fields - CONTEXT_FIELDS)}"
+            )
         responses = fixture.get("responses")
         if not isinstance(responses, dict):
             raise ContractError("replay fixture has no responses object")

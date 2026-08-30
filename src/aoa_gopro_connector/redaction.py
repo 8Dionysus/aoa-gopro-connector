@@ -52,11 +52,12 @@ VALUE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
-        "mDNS hostname",
+        "private hostname",
         re.compile(
             r"(?i)(?<![A-Za-z0-9_-])"
             r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
-            r"local\.?(?![A-Za-z0-9_-])"
+            r"(?:corp|home|home\.arpa|internal|intranet|lan|local|localdomain)"
+            r"\.?(?![A-Za-z0-9_-])"
         ),
     ),
     ("GoPro-style stable hostname", re.compile(r"\bC\d{10,}\b")),

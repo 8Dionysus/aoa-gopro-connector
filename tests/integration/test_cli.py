@@ -17,6 +17,9 @@ def test_doctor_is_offline_and_has_no_effect_surface(capsys) -> None:
     assert payload["status"] == "ok"
     assert payload["effects_available"] is False
     assert payload["live_routes"] == "read_only_allowlist"
+    assert payload["open_gopro_sdk"]["published_version"] == "0.22.0"
+    assert payload["open_gopro_sdk"]["declared_python"] == ">=3.11,<3.14"
+    assert isinstance(payload["open_gopro_sdk"]["current_python_compatible"], bool)
 
 
 def test_doctor_invalid_schema_definition_emits_structured_error(
@@ -218,4 +221,4 @@ def test_replay_cli_rejects_identifying_discovery_value(
     assert captured.out == ""
     payload = json.loads(captured.err)
     assert payload["status"] == "error"
-    assert payload["error_type"] == "ContractError"
+    assert payload["error_type"] == "PublicSafetyError"

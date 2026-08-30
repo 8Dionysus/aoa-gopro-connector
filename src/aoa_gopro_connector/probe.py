@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +17,8 @@ OFFICIAL_EVIDENCE_REFS = [
     "https://gopro.github.io/OpenGoPro/",
     "https://gopro.github.io/OpenGoPro/http_2_0",
 ]
+OPEN_GOPRO_PUBLISHED_VERSION = "0.22.0"
+OPEN_GOPRO_DECLARED_PYTHON = ">=3.11,<3.14"
 
 DISCOVERY_MECHANISMS = (
     "ble",
@@ -97,12 +98,9 @@ def _count_media(payload: dict[str, Any]) -> tuple[int, int]:
 
 
 def _sdk_compatibility() -> dict[str, Any]:
-    current = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return {
-        "published_version": "0.22.0",
-        "declared_python": ">=3.11,<3.14",
-        "current_python": current,
-        "current_python_compatible": (3, 11) <= sys.version_info[:2] < (3, 14),
+        "published_version": OPEN_GOPRO_PUBLISHED_VERSION,
+        "declared_python": OPEN_GOPRO_DECLARED_PYTHON,
         "posture": "optional_adapter",
     }
 
