@@ -94,6 +94,8 @@ class CameraState:
                 raise ContractError("an absent camera requires network=offline")
             if self.previewing or self.recording:
                 raise ContractError("an absent camera cannot preview or record")
+            if self.media is not MediaLifecycle.IDLE:
+                raise ContractError("an absent camera requires media=idle")
         if self.control is Control.READY and self.power is not Power.ON:
             raise ContractError("control-ready requires power=on")
         if self.power is Power.OFF and self.network is not Network.OFFLINE:

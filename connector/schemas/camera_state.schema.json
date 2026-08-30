@@ -40,7 +40,8 @@
           "control": {"const": "unleased"},
           "network": {"const": "offline"},
           "previewing": {"const": false},
-          "recording": {"const": false}
+          "recording": {"const": false},
+          "media": {"const": "idle"}
         }
       }
     },

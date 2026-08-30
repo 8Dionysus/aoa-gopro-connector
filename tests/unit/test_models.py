@@ -7,6 +7,7 @@ from aoa_gopro_connector.models import (
     CameraState,
     Control,
     Health,
+    MediaLifecycle,
     Network,
     Power,
     Presence,
@@ -60,6 +61,23 @@ def test_absent_state_requires_offline_network_in_model_and_schema() -> None:
     document = CameraState().as_dict()
     document["network"] = "ready"
     with pytest.raises(ContractError, match="network"):
+        validate_document("camera_state", document)
+
+
+@pytest.mark.parametrize(
+    "media",
+    [MediaLifecycle.FINALIZING, MediaLifecycle.TRANSFERRING],
+)
+def test_absent_state_requires_idle_media_in_model_and_schema(
+    media: MediaLifecycle,
+) -> None:
+    state = CameraState(media=media)
+    with pytest.raises(ContractError, match="media=idle"):
+        state.validate()
+
+    document = CameraState().as_dict()
+    document["media"] = media.value
+    with pytest.raises(ContractError, match="media"):
         validate_document("camera_state", document)
 
 
