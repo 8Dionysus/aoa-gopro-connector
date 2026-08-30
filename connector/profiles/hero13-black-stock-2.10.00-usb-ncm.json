@@ -33,9 +33,9 @@
     "local-live-read-only:hero13-stock-usb-ncm-phase0-20260829"
   ],
   "limitations": [
-    "Read-only observation does not establish control readiness.",
-    "No preview, recording, transfer, recovery, or endurance operation was attempted.",
-    "The profile applies only to the named model, firmware, and topology."
+    "control_readiness_not_established",
+    "preview_recording_transfer_recovery_endurance_not_observed",
+    "profile_scope_named_model_firmware_topology"
   ],
   "observations": {
     "media_group_count": 0,
@@ -51,7 +51,7 @@
     "network_identity_retained": false,
     "raw_responses_retained": false
   },
-  "profile_digest": "sha256:39005d5dfd2043238fe95c4bd25c1c3f6abf56d24b8f08fe3bff26186f4a4634",
+  "profile_digest": "sha256:c47747e5d66a2b8b3f0c3ab7b9b143fe7acbb00f5802d2af5dd4f4baec185e71",
   "profile_id": "gopro-hero13-black-stock-2.10.00-usb-ncm-http",
   "schema_version": "aoa_gopro_capability_profile_v1",
   "sdk": {

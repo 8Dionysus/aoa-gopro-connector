@@ -20,6 +20,11 @@ OFFICIAL_EVIDENCE_REFS = [
 ]
 OPEN_GOPRO_PUBLISHED_VERSION = "0.22.0"
 OPEN_GOPRO_DECLARED_PYTHON = ">=3.11,<3.14"
+PUBLIC_LIMITATION_CODES = (
+    "control_readiness_not_established",
+    "preview_recording_transfer_recovery_endurance_not_observed",
+    "profile_scope_named_model_firmware_topology",
+)
 
 DISCOVERY_MECHANISMS = (
     "ble",
@@ -193,11 +198,7 @@ def build_capability_profile(
             "network_identity_retained": False,
             "media_names_retained": False,
         },
-        "limitations": [
-            "Read-only observation does not establish control readiness.",
-            "No preview, recording, transfer, recovery, or endurance operation was attempted.",
-            "The profile applies only to the named model, firmware, and topology.",
-        ],
+        "limitations": list(PUBLIC_LIMITATION_CODES),
         "evidence_refs": [*OFFICIAL_EVIDENCE_REFS, context.evidence_ref],
     }
     profile = attach_digest(payload, "profile_digest")

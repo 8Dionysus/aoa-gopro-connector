@@ -251,7 +251,7 @@ def test_replay_cli_rejects_identifying_discovery_value(
     assert payload["error_type"] == "PublicSafetyError"
 
 
-def test_schema_cli_rejects_unsafe_capability_profile(
+def test_schema_cli_rejects_unreviewed_capability_limitation(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -269,7 +269,7 @@ def test_schema_cli_rejects_unsafe_capability_profile(
     assert captured.out == ""
     payload = json.loads(captured.err)
     assert payload["status"] == "error"
-    assert payload["error_type"] == "PublicSafetyError"
+    assert payload["error_type"] == "ContractError"
 
 
 def test_schema_cli_rejects_free_form_profile_evidence_ref(

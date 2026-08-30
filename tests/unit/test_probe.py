@@ -16,7 +16,7 @@ from aoa_gopro_connector.schema import validate_document
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "connector/fixtures/hero13/stock-usb-ncm-read-only.json"
 REPLAY_PROFILE_DIGEST = (
-    "sha256:936be8401ca039a5a600471e6d98b819113bd2607317ba733ba98bd17806eec1"
+    "sha256:91587aacff9b803c5246d648523c88f5952fdb2551ecc74abbaa0c5ad14fd806"
 )
 REPLAY_FIXTURE_DIGEST = (
     "sha256:8ab82b45ab6421e2b1c3cfe0e521ed3c29c43817281040b58364712dfdafab3e"
@@ -56,6 +56,11 @@ def test_replay_builds_content_addressed_public_profile() -> None:
         "declared_python": ">=3.11,<3.14",
         "posture": "optional_adapter",
     }
+    assert profile["limitations"] == [
+        "control_readiness_not_established",
+        "preview_recording_transfer_recovery_endurance_not_observed",
+        "profile_scope_named_model_firmware_topology",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -300,6 +305,15 @@ def test_capability_profile_requires_versioned_capability_vocabulary() -> None:
         validate_document("capability_profile", profile)
 
 
+def test_capability_profile_requires_complete_limitation_vocabulary() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["limitations"].pop()
+    profile = attach_digest(profile, "profile_digest")
+    with pytest.raises(ContractError, match="limitations"):
+        validate_document("capability_profile", profile)
+
+
 def test_capability_profile_rejects_unknown_capability_name() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))
@@ -401,7 +415,7 @@ def test_capability_profile_rejects_mismatched_normalized_firmware() -> None:
 def test_capability_profile_validation_rejects_stale_digest() -> None:
     path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
     profile = json.loads(path.read_text(encoding="utf-8"))
-    profile["limitations"].append("Synthetic mutation for digest validation.")
+    profile["limitations"] = list(reversed(profile["limitations"]))
     with pytest.raises(ContractError, match="profile_digest"):
         validate_document("capability_profile", profile)
 
@@ -417,7 +431,7 @@ def test_capability_profile_rejects_public_hostname_in_limitation(
     profile = json.loads(path.read_text(encoding="utf-8"))
     profile["limitations"].append(f"Observed at {hostname}.")
     profile = attach_digest(profile, "profile_digest")
-    with pytest.raises(PublicSafetyError, match="public hostname"):
+    with pytest.raises(ContractError, match="limitations"):
         validate_document("capability_profile", profile)
 
 
@@ -436,5 +450,5 @@ def test_capability_profile_rejects_credential_in_limitation(
     profile = json.loads(path.read_text(encoding="utf-8"))
     profile["limitations"] = [limitation]
     profile = attach_digest(profile, "profile_digest")
-    with pytest.raises(PublicSafetyError, match="sensitive"):
+    with pytest.raises(ContractError, match="limitations"):
         validate_document("capability_profile", profile)
