@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import codecs
 import hashlib
 import json
@@ -20,7 +21,7 @@ from aoa_gopro_connector.cli import build_parser
 from aoa_gopro_connector.digest import verify_digest
 from aoa_gopro_connector.json_io import strict_json_loads
 from aoa_gopro_connector.probe import ProbeContext, build_capability_profile
-from aoa_gopro_connector.redaction import public_safety_violations
+from aoa_gopro_connector.redaction import is_sensitive_key, public_safety_violations
 from aoa_gopro_connector.schema import SCHEMA_NAMES, load_schema, validate_document
 
 
@@ -275,6 +276,44 @@ COMMAND_LINE_RE = re.compile(
     r"aoa-gopro(?:\s|$)|pip(?:3)?\s+|git\s+|curl\s+|ffmpeg\s+|export\s+)",
     re.IGNORECASE,
 )
+PLAINTEXT_ASSIGNMENT_RE = re.compile(
+    r"(?ix)(?:"
+    r"(?P<quote>[\"'`])"
+    r"(?P<quoted_key>[a-z0-9][a-z0-9_. -]{0,95})"
+    r"(?P=quote)|"
+    r"(?<![a-z0-9_.-])"
+    r"(?P<bare_key>[a-z0-9][a-z0-9_.-]{0,95})"
+    r")\s*(?:=|:)\s*(?P<value>[^\r\n]*)"
+)
+PUBLIC_ENVIRONMENT_LOCATOR_RE = re.compile(
+    r"(?:[A-Z][A-Z0-9]*_)+(?:DIR|DIRECTORY|ENV|FILE|PATH|REF|REFERENCE|ROOT|VAR|VARIABLE)"
+)
+PUBLIC_CREDENTIAL_PLACEHOLDERS = {
+    "false",
+    "none",
+    "null",
+    "redacted",
+    "removed",
+    "true",
+    "unset",
+}
+PUBLIC_CREDENTIAL_PLACEHOLDER_PREFIXES = (
+    "$",
+    "<",
+    "auth-ref:",
+    "credential-ref:",
+    "dummy",
+    "env:",
+    "example",
+    "fake",
+    "file-ref:",
+    "fixture",
+    "os.environ",
+    "redacted-",
+    "secret-ref:",
+    "synthetic",
+    "vault:",
+)
 
 
 def _load_json(path: Path, errors: list[str]) -> object | None:
@@ -474,6 +513,123 @@ def _is_bounded_utf8_text(path: Path) -> bool:
     return True
 
 
+def _is_public_credential_placeholder(raw_value: str) -> bool:
+    value = raw_value.strip()
+    while value.startswith(("\"", "'", "`")):
+        value = value[1:].lstrip()
+    if not value:
+        return True
+    raw_token = re.split(r"[\s\"'`,;#}\]]", value, maxsplit=1)[0]
+    if PUBLIC_ENVIRONMENT_LOCATOR_RE.fullmatch(raw_token):
+        return True
+    token = raw_token.casefold()
+    return token in PUBLIC_CREDENTIAL_PLACEHOLDERS or token.startswith(
+        PUBLIC_CREDENTIAL_PLACEHOLDER_PREFIXES
+    )
+
+
+def _text_assignment_findings(
+    text: str,
+    *,
+    first_line: int = 1,
+) -> list[tuple[int, str]]:
+    findings: list[tuple[int, str]] = []
+    for offset, line in enumerate(text.splitlines() or (text,), start=first_line):
+        for match in PLAINTEXT_ASSIGNMENT_RE.finditer(line):
+            key = match.group("quoted_key") or match.group("bare_key")
+            if not is_sensitive_key(key):
+                continue
+            if _is_public_credential_placeholder(match.group("value")):
+                continue
+            findings.append((offset, key))
+    return findings
+
+
+def _python_target_keys(node: ast.expr) -> tuple[str, ...]:
+    if isinstance(node, ast.Name):
+        return (node.id,)
+    if isinstance(node, ast.Attribute):
+        return (node.attr,)
+    if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+        if isinstance(node.slice.value, str):
+            return (node.slice.value,)
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return tuple(
+            key for child in node.elts for key in _python_target_keys(child)
+        )
+    return ()
+
+
+def _python_literal_text(node: ast.AST | None) -> str | None:
+    if not isinstance(node, ast.Constant):
+        return None
+    if node.value is None:
+        return "none"
+    if isinstance(node.value, (str, int, float, bool)):
+        return str(node.value)
+    return None
+
+
+def _python_plaintext_credential_findings(
+    text: str,
+) -> list[tuple[int, str]]:
+    tree = ast.parse(text)
+    findings: set[tuple[int, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            findings.update(
+                _text_assignment_findings(node.value, first_line=node.lineno)
+            )
+        if isinstance(node, ast.Assign):
+            keys = tuple(
+                key for target in node.targets for key in _python_target_keys(target)
+            )
+            value = _python_literal_text(node.value)
+        elif isinstance(node, (ast.AnnAssign, ast.NamedExpr)):
+            keys = _python_target_keys(node.target)
+            value = _python_literal_text(node.value)
+        else:
+            keys = ()
+            value = None
+        if value is not None and not _is_public_credential_placeholder(value):
+            findings.update(
+                (node.lineno, key) for key in keys if is_sensitive_key(key)
+            )
+        if isinstance(node, ast.Dict):
+            for key_node, value_node in zip(node.keys, node.values, strict=True):
+                key = _python_literal_text(key_node)
+                value = _python_literal_text(value_node)
+                if (
+                    key is not None
+                    and value is not None
+                    and is_sensitive_key(key)
+                    and not _is_public_credential_placeholder(value)
+                ):
+                    findings.add((node.lineno, key))
+    return sorted(findings)
+
+
+def _plaintext_credential_errors(relative: Path, path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        findings = (
+            _python_plaintext_credential_findings(text)
+            if relative.suffix.casefold() in {".py", ".pyi"}
+            else _text_assignment_findings(text)
+        )
+    except SyntaxError as exc:
+        line = exc.lineno or 1
+        return [
+            "cannot inspect Python publication text: "
+            f"{relative.as_posix()}:{line}"
+        ]
+    return [
+        "forbidden plaintext credential in repository: "
+        f"{relative.as_posix()}:{line} key {key}"
+        for line, key in findings
+    ]
+
+
 def _check_private_repository_files(errors: list[str]) -> int:
     paths = _repository_publication_paths(errors)
     published = {relative.as_posix() for relative in paths}
@@ -526,6 +682,8 @@ def _check_private_repository_files(errors: list[str]) -> int:
                 "non-allowlisted binary artifact in repository: "
                 f"{relative.as_posix()}"
             )
+        if is_text:
+            errors.extend(_plaintext_credential_errors(relative, candidate))
     return len(paths)
 
 

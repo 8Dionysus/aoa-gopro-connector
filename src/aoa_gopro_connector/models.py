@@ -100,6 +100,11 @@ class CameraState:
             raise ContractError("control-ready requires power=on")
         if self.power is Power.OFF and self.network is not Network.OFFLINE:
             raise ContractError("power=off requires network=offline")
+        if (
+            self.media is MediaLifecycle.FINALIZING
+            and self.power is not Power.ON
+        ):
+            raise ContractError("media=finalizing requires power=on")
         if self.media is MediaLifecycle.TRANSFERRING:
             if self.power is not Power.ON or self.network is not Network.READY:
                 raise ContractError(

@@ -210,6 +210,51 @@ def test_repository_validator_rejects_renamed_binary_credential(
     )
 
 
+def test_repository_validator_rejects_plaintext_credential_in_neutral_text(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    notes = repo_copy / "tests/camera-notes.txt"
+    notes.write_text(
+        "camera_password=synthetic-camera-password\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "add", "tests/camera-notes.txt"],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    credential_key = "camera_" + "password"
+    credential_value = "operator-" + "owned-value"
+    notes.write_text(f"{credential_key}={credential_value}\n", encoding="utf-8")
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert (
+        "forbidden plaintext credential in repository: "
+        "tests/camera-notes.txt:1 key camera_password"
+        in payload["errors"]
+    )
+
+
 def test_repository_validator_rejects_force_tracked_credential_or_certificate(
     tmp_path: Path,
 ) -> None:

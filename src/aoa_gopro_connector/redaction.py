@@ -246,7 +246,7 @@ def _string_safety_violations(value: str, *, path: str) -> list[str]:
     return violations
 
 
-def _is_sensitive_key(value: str) -> bool:
+def is_sensitive_key(value: str) -> bool:
     snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value)
     normalized = re.sub(r"[^A-Za-z0-9]+", "_", snake_case).strip("_").casefold()
     components = tuple(part for part in normalized.split("_") if part)
@@ -284,7 +284,7 @@ def public_safety_violations(
                 key_text = str(key)
                 child_path = f"{item_path}.{key_text}"
                 item_segments = (*segments, key_text)
-                if _is_sensitive_key(key_text):
+                if is_sensitive_key(key_text):
                     violations.append(f"{child_path}: forbidden identity/secret key")
                 violations.extend(
                     _string_safety_violations(key_text, path=f"{child_path} key")
@@ -312,7 +312,7 @@ def public_safety_violations(
         if isinstance(item_value, str):
             violations.extend(_string_safety_violations(item_value, path=item_path))
             is_profile_limitation = _is_profile_limitation_path(segments)
-            if is_profile_limitation and _is_sensitive_key(item_value):
+            if is_profile_limitation and is_sensitive_key(item_value):
                 violations.append(
                     f"{item_path}: contains sensitive identity/credential marker"
                 )

@@ -438,9 +438,9 @@ def test_capability_profile_rejects_public_hostname_in_limitation(
 @pytest.mark.parametrize(
     "limitation",
     [
-        "Wi-Fi password: correct horse battery staple",
-        "WPA PSK: correct horse battery staple",
-        "Admin PIN: 123456",
+        "Wi-Fi password: synthetic-password",
+        "WPA PSK: synthetic-psk",
+        "Admin PIN: synthetic-pin",
     ],
 )
 def test_capability_profile_rejects_credential_in_limitation(

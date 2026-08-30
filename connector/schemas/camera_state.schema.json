@@ -75,6 +75,13 @@
     },
     {
       "if": {
+        "properties": {"media": {"const": "finalizing"}},
+        "required": ["media"]
+      },
+      "then": {"properties": {"power": {"const": "on"}}}
+    },
+    {
+      "if": {
         "properties": {"media": {"const": "transferring"}},
         "required": ["media"]
       },

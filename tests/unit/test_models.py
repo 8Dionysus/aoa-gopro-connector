@@ -156,6 +156,44 @@ def test_media_transfer_accepts_powered_ready_network() -> None:
     validate_document("camera_state", state.as_dict())
 
 
+@pytest.mark.parametrize(
+    "power",
+    [Power.UNKNOWN, Power.OFF, Power.WAKING, Power.SLEEPING],
+)
+def test_media_finalization_requires_power_on_in_model_and_schema(
+    power: Power,
+) -> None:
+    state = CameraState(
+        presence=Presence.DISCOVERED,
+        power=power,
+        network=Network.OFFLINE,
+        media=MediaLifecycle.FINALIZING,
+    )
+    with pytest.raises(ContractError, match="media=finalizing requires power=on"):
+        state.validate()
+
+    document = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.ON,
+        network=Network.OFFLINE,
+        media=MediaLifecycle.FINALIZING,
+    ).as_dict()
+    document["power"] = power.value
+    with pytest.raises(ContractError, match="power"):
+        validate_document("camera_state", document)
+
+
+def test_media_finalization_does_not_require_ready_network() -> None:
+    state = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.ON,
+        network=Network.OFFLINE,
+        media=MediaLifecycle.FINALIZING,
+    )
+    state.validate()
+    validate_document("camera_state", state.as_dict())
+
+
 def test_capability_profile_id_is_derived_from_sanitized_fields() -> None:
     assert (
         canonical_profile_id(
