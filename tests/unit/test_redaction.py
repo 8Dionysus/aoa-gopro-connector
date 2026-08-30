@@ -50,6 +50,12 @@ def test_public_safety_rejects_camera_media_filename_by_wire_path() -> None:
         assert_public_safe({"media": [{"fs": [{"n": "GOPR0123.MP4"}]}]})
 
 
+def test_public_safety_allows_only_fixed_synthetic_media_filename() -> None:
+    assert_public_safe({"media": [{"fs": [{"n": "synthetic-video.mp4"}]}]})
+    with pytest.raises(PublicSafetyError, match="camera media filename"):
+        assert_public_safe({"media": [{"fs": [{"n": "synthetic-kitchen.mp4"}]}]})
+
+
 def test_unrelated_short_n_key_is_not_globally_sensitive() -> None:
     assert_public_safe({"n": "synthetic-non-media-value"})
 

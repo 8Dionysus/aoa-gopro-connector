@@ -126,6 +126,17 @@ def test_replay_fixture_rejects_non_gopro_media_directory() -> None:
         ReplayReadAdapter(value)
 
 
+def test_replay_fixture_accepts_fixed_synthetic_media_filename() -> None:
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value["responses"]["/gopro/media/list"]["media"] = [
+        {"d": "100GOPRO", "fs": [{"n": "synthetic-video.mp4"}]}
+    ]
+    adapter = ReplayReadAdapter(value)
+    profile = build_capability_profile(adapter, _context(adapter))
+    assert profile["observations"]["media_group_count"] == 1
+    assert profile["observations"]["media_item_count"] == 1
+
+
 def test_replay_fixture_rejects_non_finite_values() -> None:
     value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     value["responses"]["/gopro/camera/state"]["status"]["8"] = float("nan")
@@ -315,4 +326,12 @@ def test_capability_profile_rejects_noncanonical_profile_id() -> None:
     profile["profile_id"] = "gopro-kitchen-hero13"
     profile = attach_digest(profile, "profile_digest")
     with pytest.raises(ContractError, match="profile_id"):
+        validate_document("capability_profile", profile)
+
+
+def test_capability_profile_validation_rejects_stale_digest() -> None:
+    path = REPO_ROOT / "connector/profiles/hero13-black-stock-2.10.00-usb-ncm.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    profile["limitations"].append("Synthetic mutation for digest validation.")
+    with pytest.raises(ContractError, match="profile_digest"):
         validate_document("capability_profile", profile)

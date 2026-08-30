@@ -124,6 +124,13 @@ IPV6_CANDIDATE_PATTERN = re.compile(
 )
 MAX_PUBLIC_ARTIFACT_DEPTH = 64
 MAX_PUBLIC_ARTIFACT_NODES = 50_000
+SYNTHETIC_MEDIA_FILENAMES = {
+    "synthetic-metadata.gpmf",
+    "synthetic-photo.jpg",
+    "synthetic-preview.lrv",
+    "synthetic-thumbnail.thm",
+    "synthetic-video.mp4",
+}
 
 
 def _contains_ipv6(value: str) -> bool:
@@ -202,7 +209,10 @@ def public_safety_violations(
                     _string_safety_violations(key_text, path=f"{child_path} key")
                 )
                 if _is_media_filename_path(item_segments):
-                    violations.append(f"{child_path}: forbidden camera media filename")
+                    if item not in SYNTHETIC_MEDIA_FILENAMES:
+                        violations.append(
+                            f"{child_path}: forbidden camera media filename"
+                        )
                 stack.append((item, child_path, item_segments, depth + 1))
             continue
         if isinstance(item_value, Sequence) and not isinstance(

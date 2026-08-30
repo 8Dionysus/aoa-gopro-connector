@@ -11,6 +11,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
 
+from .digest import verify_digest
 from .errors import ContractError
 from .json_io import strict_json_loads
 from .models import canonical_profile_id
@@ -25,6 +26,13 @@ SCHEMA_NAMES = (
     "event",
     "media_manifest",
 )
+PACKET_DIGEST_FIELDS = {
+    "capability_profile": "profile_digest",
+    "operation_plan": "plan_digest",
+    "operation_receipt": "receipt_digest",
+    "event": "event_digest",
+    "media_manifest": "manifest_digest",
+}
 
 
 def schema_root() -> Path:
@@ -167,3 +175,6 @@ def validate_document(name: str, document: Any) -> None:
         _validate_operation_receipt_timeline(document)
     elif normalized_name == "event":
         _validate_event_freshness(document)
+    digest_field = PACKET_DIGEST_FIELDS.get(normalized_name)
+    if digest_field is not None:
+        verify_digest(document, digest_field)

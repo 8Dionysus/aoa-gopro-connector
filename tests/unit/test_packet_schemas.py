@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aoa_gopro_connector.digest import ZERO_DIGEST
+from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest
 from aoa_gopro_connector.errors import ContractError
 from aoa_gopro_connector.schema import validate_document
 
@@ -11,7 +11,7 @@ PROFILE_DIGEST = "sha256:" + "1" * 64
 
 
 def _operation_plan(effect_kind: str = "record.start") -> dict[str, object]:
-    return {
+    payload = {
         "schema_version": "aoa_gopro_operation_plan_v1",
         "operation_id": "operation:fixture-record",
         "idempotency_key": "fixture-record-0001",
@@ -46,10 +46,11 @@ def _operation_plan(effect_kind: str = "record.start") -> dict[str, object]:
         },
         "plan_digest": ZERO_DIGEST,
     }
+    return attach_digest(payload, "plan_digest")
 
 
 def _event() -> dict[str, object]:
-    return {
+    payload = {
         "schema_version": "aoa_gopro_event_v1",
         "event_id": "event:fixture-discovered",
         "event_type": "camera.discovered",
@@ -69,6 +70,27 @@ def _event() -> dict[str, object]:
         "evidence_refs": ["fixture:event"],
         "event_digest": ZERO_DIGEST,
     }
+    return attach_digest(payload, "event_digest")
+
+
+def _media_manifest() -> dict[str, object]:
+    payload = {
+        "schema_version": "aoa_gopro_media_manifest_v1",
+        "manifest_id": "media-manifest:fixture-empty",
+        "device_ref": "device:fixture-camera",
+        "observed_at": "2026-08-30T05:00:00Z",
+        "camera_media_ref": "camera-media:fixture",
+        "media_kind": "video",
+        "size_bytes": None,
+        "source_checksum": None,
+        "ingest_state": "inventory_only",
+        "original_immutable": True,
+        "retention_class": "inventory_only",
+        "derivatives": [],
+        "provenance_refs": ["fixture:inventory"],
+        "manifest_digest": ZERO_DIGEST,
+    }
+    return attach_digest(payload, "manifest_digest")
 
 
 def test_operation_plan_contract() -> None:
@@ -157,25 +179,7 @@ def test_date_time_formats_are_enforced() -> None:
 
 def test_event_and_media_contracts() -> None:
     validate_document("event", _event())
-    validate_document(
-        "media_manifest",
-        {
-            "schema_version": "aoa_gopro_media_manifest_v1",
-            "manifest_id": "media-manifest:fixture-empty",
-            "device_ref": "device:fixture-camera",
-            "observed_at": "2026-08-30T05:00:00Z",
-            "camera_media_ref": "camera-media:fixture",
-            "media_kind": "video",
-            "size_bytes": None,
-            "source_checksum": None,
-            "ingest_state": "inventory_only",
-            "original_immutable": True,
-            "retention_class": "inventory_only",
-            "derivatives": [],
-            "provenance_refs": ["fixture:inventory"],
-            "manifest_digest": ZERO_DIGEST,
-        },
-    )
+    validate_document("media_manifest", _media_manifest())
 
 
 def test_event_rejects_expiration_before_observation() -> None:
@@ -189,6 +193,7 @@ def test_event_freshness_compares_instants_across_offsets() -> None:
     event = _event()
     event["freshness"]["observed_at"] = "2026-08-30T05:00:00+01:00"
     event["freshness"]["expires_at"] = "2026-08-30T04:00:00Z"
+    event = attach_digest(event, "event_digest")
     validate_document("event", event)
 
 
@@ -200,3 +205,20 @@ def test_event_rejects_invalid_causal_operation_id(
     event["causal_operation_id"] = causal_operation_id
     with pytest.raises(ContractError, match="causal_operation_id"):
         validate_document("event", event)
+
+
+def test_digest_bearing_packet_validation_rejects_stale_integrity_fields() -> None:
+    plan = _operation_plan()
+    plan["idempotency_key"] = "fixture-record-mutated"
+    with pytest.raises(ContractError, match="plan_digest"):
+        validate_document("operation_plan", plan)
+
+    event = _event()
+    event["monotonic_ns"] = 2
+    with pytest.raises(ContractError, match="event_digest"):
+        validate_document("event", event)
+
+    manifest = _media_manifest()
+    manifest["retention_class"] = "ephemeral"
+    with pytest.raises(ContractError, match="manifest_digest"):
+        validate_document("media_manifest", manifest)

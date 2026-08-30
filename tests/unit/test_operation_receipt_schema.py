@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aoa_gopro_connector.digest import ZERO_DIGEST
+from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest
 from aoa_gopro_connector.errors import ContractError
 from aoa_gopro_connector.schema import validate_document
 
@@ -12,7 +12,7 @@ STATE_DIGEST = "sha256:" + "2" * 64
 
 
 def _receipt(outcome: str = "succeeded") -> dict[str, object]:
-    return {
+    payload = {
         "schema_version": "aoa_gopro_operation_receipt_v1",
         "receipt_id": "receipt:fixture-record",
         "operation_id": "operation:fixture-record",
@@ -69,6 +69,7 @@ def _receipt(outcome: str = "succeeded") -> dict[str, object]:
         "artifact_refs": [],
         "receipt_digest": ZERO_DIGEST,
     }
+    return attach_digest(payload, "receipt_digest")
 
 
 def test_successful_receipt_has_observed_satisfied_postcondition() -> None:
@@ -114,6 +115,7 @@ def test_successful_receipt_rejects_unproven_postconditions(
 def test_failed_receipt_may_preserve_unknown_postcondition() -> None:
     receipt = _receipt("failed")
     receipt["postcondition_verdicts"] = []
+    receipt = attach_digest(receipt, "receipt_digest")
     validate_document("operation_receipt", receipt)
 
 
@@ -167,6 +169,7 @@ def test_recovery_receipt_accepts_attempted_recovery() -> None:
         "attempt_count": 1,
         "result": "recovered",
     }
+    receipt = attach_digest(receipt, "receipt_digest")
     validate_document("operation_receipt", receipt)
 
 
@@ -182,6 +185,7 @@ def test_receipt_timeline_compares_instants_across_offsets() -> None:
     receipt["started_at"] = "2026-08-30T05:00:00+01:00"
     receipt["finished_at"] = "2026-08-30T04:00:00Z"
     receipt["steps"][0]["observed_at"] = "2026-08-30T04:00:00Z"
+    receipt = attach_digest(receipt, "receipt_digest")
     validate_document("operation_receipt", receipt)
 
 
@@ -193,4 +197,11 @@ def test_receipt_rejects_step_outside_operation_interval(observed_at: str) -> No
     receipt = _receipt()
     receipt["steps"][0]["observed_at"] = observed_at
     with pytest.raises(ContractError, match="steps.0.observed_at"):
+        validate_document("operation_receipt", receipt)
+
+
+def test_receipt_validation_rejects_stale_digest() -> None:
+    receipt = _receipt()
+    receipt["actor_version"] = "fixture-actor-v2"
+    with pytest.raises(ContractError, match="receipt_digest"):
         validate_document("operation_receipt", receipt)

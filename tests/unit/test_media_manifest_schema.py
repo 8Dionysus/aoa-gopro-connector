@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aoa_gopro_connector.digest import ZERO_DIGEST
+from aoa_gopro_connector.digest import ZERO_DIGEST, attach_digest
 from aoa_gopro_connector.errors import ContractError
 from aoa_gopro_connector.schema import validate_document
 
@@ -11,7 +11,7 @@ SOURCE_DIGEST = "sha256:" + "3" * 64
 
 
 def _manifest(ingest_state: str = "inventory_only") -> dict[str, object]:
-    return {
+    payload = {
         "schema_version": "aoa_gopro_media_manifest_v1",
         "manifest_id": "media-manifest:fixture-video",
         "device_ref": "device:fixture-camera",
@@ -27,6 +27,7 @@ def _manifest(ingest_state: str = "inventory_only") -> dict[str, object]:
         "provenance_refs": ["fixture:inventory"],
         "manifest_digest": ZERO_DIGEST,
     }
+    return attach_digest(payload, "manifest_digest")
 
 
 def test_inventory_manifest_may_precede_transfer_integrity() -> None:
@@ -44,4 +45,5 @@ def test_completed_ingest_requires_concrete_size_and_checksum() -> None:
 
     manifest["source_checksum"] = SOURCE_DIGEST
     manifest["retention_class"] = "ephemeral"
+    manifest = attach_digest(manifest, "manifest_digest")
     validate_document("media_manifest", manifest)
