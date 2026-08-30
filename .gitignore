@@ -26,10 +26,16 @@
 /captures/
 /packet-dumps/
 /exports/
-*.mp4
+*.360
+*.gpr
+*.jpeg
+*.jpg
 *.lrv
+*.mov
+*.mp4
 *.thm
 *.gpmf
+*.wav
 *.cer
 *.crt
 *.der

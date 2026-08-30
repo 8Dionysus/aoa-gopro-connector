@@ -82,8 +82,18 @@ def test_repository_validator_checks_every_discovered_public_artifact(
     )
 
 
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "tests/private.mp4",
+        "tests/private.jpg",
+        "tests/private.gpr",
+        "tests/private.360",
+    ],
+)
 def test_repository_validator_rejects_force_tracked_private_media(
     tmp_path: Path,
+    relative_path: str,
 ) -> None:
     repo_copy = tmp_path / "repo"
     shutil.copytree(
@@ -98,10 +108,10 @@ def test_repository_validator_rejects_force_tracked_private_media(
         ),
     )
     subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
-    private_media = repo_copy / "tests/private.mp4"
+    private_media = repo_copy / relative_path
     private_media.write_bytes(b"not a public fixture")
     subprocess.run(
-        ["git", "add", "-f", "tests/private.mp4"],
+        ["git", "add", "-f", relative_path],
         cwd=repo_copy,
         check=True,
     )
@@ -111,7 +121,7 @@ def test_repository_validator_rejects_force_tracked_private_media(
     payload = json.loads(completed.stdout)
     assert payload["status"] == "error"
     assert (
-        "forbidden private/heavy media file in repository: tests/private.mp4"
+        "forbidden private/heavy media file in repository: " + relative_path
         in payload["errors"]
     )
 

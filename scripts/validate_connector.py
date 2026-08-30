@@ -97,10 +97,16 @@ REQUIRED_GITIGNORE = [
     "/raw/",
     "/captures/",
     "/packet-dumps/",
-    "*.mp4",
+    "*.360",
+    "*.gpr",
+    "*.jpeg",
+    "*.jpg",
     "*.lrv",
+    "*.mov",
+    "*.mp4",
     "*.thm",
     "*.gpmf",
+    "*.wav",
     "*.cer",
     "*.crt",
     "*.der",
@@ -134,10 +140,16 @@ FORBIDDEN_HEAVY_ROOTS = {
 }
 
 FORBIDDEN_PRIVATE_MEDIA_SUFFIXES = {
+    ".360",
     ".gpmf",
+    ".gpr",
+    ".jpeg",
+    ".jpg",
     ".lrv",
+    ".mov",
     ".mp4",
     ".thm",
+    ".wav",
 }
 
 FORBIDDEN_CREDENTIAL_SUFFIXES = {
