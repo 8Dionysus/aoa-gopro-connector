@@ -8,6 +8,8 @@ from aoa_gopro_connector.schema import validate_document
 
 
 SOURCE_DIGEST = "sha256:" + "3" * 64
+DERIVATIVE_DIGEST_A = "sha256:" + "4" * 64
+DERIVATIVE_DIGEST_B = "sha256:" + "5" * 64
 
 
 def _manifest(ingest_state: str = "inventory_only") -> dict[str, object]:
@@ -56,3 +58,45 @@ def test_completed_ingest_rejects_inventory_only_retention() -> None:
     manifest = attach_digest(manifest, "manifest_digest")
     with pytest.raises(ContractError, match="retention_class"):
         validate_document("media_manifest", manifest)
+
+
+def test_derivative_artifact_references_must_be_unique() -> None:
+    manifest = _manifest()
+    manifest["derivatives"] = [
+        {
+            "kind": "proxy",
+            "artifact_ref": "artifact:shared-proxy",
+            "checksum": DERIVATIVE_DIGEST_A,
+            "provenance_ref": "receipt:first-derivative",
+        },
+        {
+            "kind": "semantic",
+            "artifact_ref": "artifact:shared-proxy",
+            "checksum": DERIVATIVE_DIGEST_B,
+            "provenance_ref": "receipt:second-derivative",
+        },
+    ]
+    manifest = attach_digest(manifest, "manifest_digest")
+
+    with pytest.raises(ContractError, match="duplicate artifact reference"):
+        validate_document("media_manifest", manifest)
+
+
+def test_distinct_derivative_artifact_references_are_valid() -> None:
+    manifest = _manifest()
+    manifest["derivatives"] = [
+        {
+            "kind": "proxy",
+            "artifact_ref": "artifact:first-proxy",
+            "checksum": DERIVATIVE_DIGEST_A,
+            "provenance_ref": "receipt:first-derivative",
+        },
+        {
+            "kind": "semantic",
+            "artifact_ref": "artifact:second-observation",
+            "checksum": DERIVATIVE_DIGEST_B,
+            "provenance_ref": "receipt:second-derivative",
+        },
+    ]
+    manifest = attach_digest(manifest, "manifest_digest")
+    validate_document("media_manifest", manifest)

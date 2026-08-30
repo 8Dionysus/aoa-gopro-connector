@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -114,6 +115,24 @@ FORBIDDEN_HEAVY_ROOTS = {
     "exports",
 }
 
+FORBIDDEN_PRIVATE_MEDIA_SUFFIXES = {
+    ".gpmf",
+    ".lrv",
+    ".mp4",
+    ".thm",
+}
+
+SNAPSHOT_SCAN_EXCLUDED_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+}
+
 FORBIDDEN_DUPLICATE_DOCS = {
     "docs/STATUS.md",
     "docs/ROADMAP.md",
@@ -194,6 +213,52 @@ def _check_cli_surface(errors: list[str]) -> None:
         errors.append(f"Phase 0 CLI exposes effect commands: {sorted(choices & forbidden)}")
 
 
+def _repository_publication_paths(errors: list[str]) -> tuple[Path, ...]:
+    """Return indexed paths in Git, or all files in an exported source snapshot."""
+
+    if (REPO_ROOT / ".git").exists():
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(REPO_ROOT), "ls-files", "-z", "--cached"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            errors.append(f"cannot inspect Git publication index: {exc}")
+            return ()
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or f"exit {completed.returncode}"
+            errors.append(f"cannot inspect Git publication index: {detail}")
+            return ()
+        return tuple(
+            Path(value) for value in completed.stdout.split("\0") if value
+        )
+
+    paths: list[Path] = []
+    for path in REPO_ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(REPO_ROOT)
+        if any(part in SNAPSHOT_SCAN_EXCLUDED_DIRS for part in relative.parts):
+            continue
+        if any(part.endswith(".egg-info") for part in relative.parts):
+            continue
+        paths.append(relative)
+    return tuple(sorted(paths))
+
+
+def _check_private_media_files(errors: list[str]) -> int:
+    paths = _repository_publication_paths(errors)
+    for relative in paths:
+        if relative.suffix.casefold() in FORBIDDEN_PRIVATE_MEDIA_SUFFIXES:
+            errors.append(
+                "forbidden private/heavy media file in repository: "
+                f"{relative.as_posix()}"
+            )
+    return len(paths)
+
+
 def _fixture_context(adapter: ReplayReadAdapter) -> ProbeContext:
     context = adapter.fixture["context"]
     return ProbeContext(
@@ -222,6 +287,7 @@ def main() -> int:
     for name in FORBIDDEN_HEAVY_ROOTS:
         if (REPO_ROOT / name).exists():
             errors.append(f"heavy/private root exists in Git repository: {name}")
+    publication_path_count = _check_private_media_files(errors)
 
     gitignore_path = REPO_ROOT / ".gitignore"
     gitignore = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
@@ -305,6 +371,7 @@ def main() -> int:
             "required_dirs": len(REQUIRED_DIRS),
             "schemas": len(SCHEMA_NAMES),
             "public_json_artifacts": len(public_json_paths),
+            "publication_paths": publication_path_count,
         },
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))

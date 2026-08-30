@@ -74,6 +74,18 @@
       }
     },
     {
+      "if": {
+        "properties": {"media": {"const": "transferring"}},
+        "required": ["media"]
+      },
+      "then": {
+        "properties": {
+          "power": {"const": "on"},
+          "network": {"const": "ready"}
+        }
+      }
+    },
+    {
       "if": {"properties": {"health": {"const": "healthy"}}},
       "then": {"properties": {"degraded_reasons": {"maxItems": 0}}},
       "else": {"properties": {"degraded_reasons": {"minItems": 1}}}

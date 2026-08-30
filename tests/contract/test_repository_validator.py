@@ -78,3 +78,37 @@ def test_repository_validator_checks_every_discovered_public_artifact(
         "replay fixture invalid connector/fixtures/additional-invalid.json" in error
         for error in payload["errors"]
     )
+
+
+def test_repository_validator_rejects_force_tracked_private_media(
+    tmp_path: Path,
+) -> None:
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(
+        REPO_ROOT,
+        repo_copy,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "*.egg-info",
+        ),
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo_copy, check=True)
+    private_media = repo_copy / "tests/private.mp4"
+    private_media.write_bytes(b"not a public fixture")
+    subprocess.run(
+        ["git", "add", "-f", "tests/private.mp4"],
+        cwd=repo_copy,
+        check=True,
+    )
+
+    completed = _run_validator(repo_copy)
+    assert completed.returncode == 1, completed.stdout + completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "error"
+    assert (
+        "forbidden private/heavy media file in repository: tests/private.mp4"
+        in payload["errors"]
+    )

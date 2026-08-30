@@ -330,6 +330,18 @@ def _validate_capability_profile_identity(document: dict[str, Any]) -> None:
         )
 
 
+def _validate_media_manifest_derivative_refs(document: dict[str, Any]) -> None:
+    seen: set[str] = set()
+    for index, derivative in enumerate(document["derivatives"]):
+        artifact_ref = derivative["artifact_ref"]
+        if artifact_ref in seen:
+            raise ContractError(
+                "media_manifest validation failed at "
+                f"derivatives.{index}.artifact_ref: duplicate artifact reference"
+            )
+        seen.add(artifact_ref)
+
+
 def validate_document(name: str, document: Any) -> None:
     normalized_name = name.removesuffix(".schema.json")
     validator = Draft202012Validator(
@@ -349,6 +361,8 @@ def validate_document(name: str, document: Any) -> None:
         _validate_operation_receipt_snapshots(document)
     elif normalized_name == "event":
         _validate_event_freshness(document)
+    elif normalized_name == "media_manifest":
+        _validate_media_manifest_derivative_refs(document)
     digest_field = PACKET_DIGEST_FIELDS.get(normalized_name)
     if digest_field is not None:
         verify_digest(document, digest_field)

@@ -110,6 +110,52 @@ def test_powered_off_state_requires_offline_network_in_model_and_schema() -> Non
         validate_document("camera_state", document)
 
 
+@pytest.mark.parametrize(
+    ("power", "network"),
+    [
+        (Power.OFF, Network.OFFLINE),
+        (Power.ON, Network.DISCOVERABLE),
+    ],
+)
+def test_media_transfer_requires_powered_ready_network_in_model_and_schema(
+    power: Power,
+    network: Network,
+) -> None:
+    state = CameraState(
+        presence=Presence.DISCOVERED,
+        power=power,
+        network=network,
+        media=MediaLifecycle.TRANSFERRING,
+    )
+    with pytest.raises(
+        ContractError,
+        match="media=transferring requires power=on and network=ready",
+    ):
+        state.validate()
+
+    document = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.ON,
+        network=Network.READY,
+        media=MediaLifecycle.TRANSFERRING,
+    ).as_dict()
+    document["power"] = power.value
+    document["network"] = network.value
+    with pytest.raises(ContractError):
+        validate_document("camera_state", document)
+
+
+def test_media_transfer_accepts_powered_ready_network() -> None:
+    state = CameraState(
+        presence=Presence.DISCOVERED,
+        power=Power.ON,
+        network=Network.READY,
+        media=MediaLifecycle.TRANSFERRING,
+    )
+    state.validate()
+    validate_document("camera_state", state.as_dict())
+
+
 def test_capability_profile_id_is_derived_from_sanitized_fields() -> None:
     assert (
         canonical_profile_id(
